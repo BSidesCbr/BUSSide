@@ -1,3 +1,10 @@
+#include <Boards.h>
+#include <Firmata.h>
+#include <FirmataConstants.h>
+#include <FirmataDefines.h>
+#include <FirmataMarshaller.h>
+#include <FirmataParser.h>
+
 #include <pins_arduino.h>
 #include "BUSSide.h"
 //#include <ESP8266WiFi.h>
@@ -50,56 +57,6 @@ delay_us(int us)
   while (microsTime() < endTime);
 }
 
-uint8_t
-read_u8()
-{
-  uint8_t s1;
-  while (!Serial.available())
-    ESP.wdtFeed();
-  s1 = Serial.read();
-  return s1;
-}
-
-uint32_t
-read_size_u32()
-{
-  uint8_t s1, s2, s3, s4;
-  uint32_t readsize;
-
-  s4 = read_u8();
-  s3 = read_u8();
-  s2 = read_u8();
-  s1 = read_u8();
-  readsize = s1 + (s2 << 8) + (s3 << 16) + (s4 << 24);
-  return readsize;
-}
-
-void
-write_u8(uint8_t s)
-{
-  Serial.write(s);
-}
-
-void
-write_size_u32(uint32 writesize)
-{
-  write_u8((writesize & 0xff000000) >> 24);
-  write_u8((writesize & 0x00ff0000) >> 16);
-  write_u8((writesize & 0x0000ff00) >>  8);
-  write_u8((writesize & 0x000000ff));
-}
-void
-printHelp()
-{
-  Serial.println("Commands:");
-  Serial.println("\tU\tAutomatically detect UART");
-  Serial.println("\ts\tDiscover I2C Slave Devices");
-  Serial.println("\ti\tDump I2C EEPROM");
-  Serial.println("\tr\tDump SPI Flash");
-  Serial.println("\td\tDiscover active pins");
-  Serial.println();
-}
-
 void
 reset_gpios()
 {
@@ -122,76 +79,83 @@ setup()
   usTicks = asm_ccount();
 }
 
-static int cmdBufIndex = 0;
-static char cmdBuf[20]; 
+static uint32_t sequence_number = 1;
 
 void
 loop()
 {
-    char ch;
+    struct bs_request_s request;
+    struct bs_reply_s reply;
+    int rv;
 
-    if (Serial.available() <= 0)
-      return;
- 
-    ch = Serial.read();
-    if (ch == -1)
-        Serial.printf("--- Serial error\n");
-    if (ch != 10 && ch != 13 && ch != '.') {
-        Serial.write(ch);
-        Serial.flush();
-        if (cmdBufIndex < 10)
-          cmdBuf[cmdBufIndex++] = ch;
+    rv = Serial.readBytes((char *)&request, BS_REQUEST_SIZE);
+    if (rv == -1)
         return;
-    }
-       
-    if (cmdBufIndex == 0 || cmdBuf[0] != '.')
-      Serial.println();
-  
-    if (cmdBufIndex == 0) {
-      Serial.print('>');
-      Serial.flush();
+    while (Serial.available() > 0)
+      (void)Serial.read();
+
+    if (crc_mem((char *)&request, BS_REQUEST_SIZE - 4) != request.bs_checksum) {
       return;
     }
-    cmdBufIndex = 0;
-    
-    switch (cmdBuf[0]) {
-    case '.':
+    if (request.bs_sequence_number <= sequence_number)
       return;
+    sequence_number = request.bs_sequence_number;
+
+    memset(&reply, 0, sizeof(reply));
+    reply.bs_command = request.bs_command;
+   
+    switch (request.bs_command) {
+    case BS_SPI_SEND:
+      rv = send_SPI_command(&request, &reply);
+      break;
       
-    case 'd':
-      data_discovery();
+    case BS_DATA_DISCOVERY:
+      rv = data_discovery(&request, &reply);
       break;
 
-    case 'U':
-      UART_all_line_settings();
+    case BS_UART_LINE_SETTINGS:
+      rv = data_discovery(&request, &reply);
+      if (rv != 0)
+        break;
+      rv = UART_all_line_settings(&request, &reply);
       break;
 
-    case 's':
-      discover_I2C_slaves();
+    case BS_I2C_DISCOVER_SLAVES:
+      rv = discover_I2C_slaves(&request, &reply);
       break;
 
-    case 'i':
-      read_I2C_eeprom();
+    case BS_I2C_FLASH_DUMP:
+      rv = read_I2C_eeprom(&request, &reply);
       break;
           
-    case 'r':
-      read_SPI_flash();
+    case BS_SPI_FLASH_DUMP:
+      rv = read_SPI_flash(&request, &reply);
       break;  
 
-    case 'j':
-      JTAG_scan();
-      break;
-
-    case '#':
+    case BS_SPI_READID:
+      rv = SPI_read_id(&request, &reply);
       break;
       
-    case 'h':
+    case BS_JTAG_DISCOVER_PINOUT:
+      rv = JTAG_scan(&request, &reply);
+      break;
+
+    case BS_ECHO:
+      memcpy(&reply, &request, BS_REPLY_SIZE - 4);
+      reply.bs_command = BS_REPLY_ECHO;
+      rv = 0;
+      break;
+      
     default:
-      printHelp();
+      rv = -1;
       break;
     }
-
+    
+    reply.bs_sequence_number = request.bs_sequence_number;
+    if (rv == 0) {
+      reply.bs_checksum = crc_mem((char *)&reply, BS_REPLY_SIZE - 4);
+      Serial.write((char *)&reply, BS_REPLY_SIZE);
+    }
+    
     reset_gpios();
-    Serial.print('>');
-    Serial.flush();
 }

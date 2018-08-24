@@ -172,9 +172,9 @@ calcBaud(int pin, int *widths, int nwidths)
   }
   baudIndex = minDelayIndex;
 
-  dtostrf(min1, 4, 2, fstr);
-  sprintf(s, "\r\n\r\nBITWIDTH: %s\r\nBAUDRATE measured=%i nearest=%i\r\n", fstr, (int)(1000000.0/min1), uartInfo[baudIndex].baudRate);
-  Serial.print(s);
+//  dtostrf(min1, 4, 2, fstr);
+//  sprintf(s, "\r\n\r\nBITWIDTH: %s\r\nBAUDRATE measured=%i nearest=%i\r\n", fstr, (int)(1000000.0/min1), uartInfo[baudIndex].baudRate);
+//  Serial.print(s);
   return baudIndex;
 }
 
@@ -209,7 +209,7 @@ calcParity(int frameSize, int stopBits, int *widths, int nwidths)
     }
     if (stopTime >= w && stopTime < (w + widths[i])) {
       if ((i % 2) != widths[0]) {
-        Serial.printf("stop error\n");
+//        Serial.printf("stop error\n");
         framingErrors++;
         if (framingErrors >= 1)
           return 0;
@@ -243,15 +243,16 @@ static float bitTime;
 #define NWIDTHS 100
 
 static int
-UART_line_settings_direct(int pin)
+UART_line_settings_direct(struct bs_request_s *request, struct bs_reply_s *reply, int index)
 {
   int widths[NWIDTHS];
   char s[100];
   unsigned long timeStart;
   int n;
   int ret;
+  int pin;
 
-  pin = gpioIndex[pin];
+  pin = gpioIndex[index];
   if (pin == D0)
     pinMode(pin, INPUT);
   else
@@ -259,17 +260,16 @@ UART_line_settings_direct(int pin)
 
   ret = buildwidths(pin, widths, NWIDTHS);
   if (ret) {
-    Serial.printf("--- Couldn't sample %i\n", ret);
+//    Serial.printf("--- Couldn't sample %i\n", ret);
     return -6;
   }
-  
   uartSpeedIndex = calcBaud(pin, widths, NWIDTHS);
   if (uartSpeedIndex < 0) {
-    Serial.println("Timeout. Not a UART.\n");
+//    Serial.println("Timeout. Not a UART.\n");
     return -1;
   }
   bitTime = uartInfo[uartSpeedIndex].microsDelay;
-  
+
   frameSize = -1;
   for (int i = 7; i < 14; i++) {
     if (tryFrameSize(i, 1, widths, NWIDTHS)) {
@@ -278,59 +278,68 @@ UART_line_settings_direct(int pin)
     }
   }
   if (frameSize < 0) {
-    Serial.println("UART framing not detected.\nNot a UART.");
+//    Serial.println("UART framing not detected.\nNot a UART.");
     return -1;
-  } else
-    sprintf(s, "FRAMESIZE %i", frameSize);
-  Serial.println(s);
-  if (tryFrameSize(frameSize, 2, widths, NWIDTHS))
+  } else {
+//    sprintf(s, "FRAMESIZE %i", frameSize);
+  }
+//  Serial.println(s);
+  if (tryFrameSize(frameSize, 2, widths, NWIDTHS)){
     stopBits = 2;
-  else
+  } else {
     stopBits = 1;
-  sprintf(s, "STOPBITS: %i", stopBits);
-  Serial.println(s);
+  }
+//  sprintf(s, "STOPBITS: %i", stopBits);
+//  Serial.println(s);
 
   parity = calcParity(frameSize, stopBits, widths, NWIDTHS);
   if (parity == -2) {
-    Serial.println("Parity Timeout. Not a UART.\n");
+//    Serial.println("Parity Timeout. Not a UART.\n");
     return -1;
   } else if (parity < 0) {
     dataBits = frameSize - stopBits - 1;
-    sprintf(s, "PARITY: NONE");
+//    sprintf(s, "PARITY: NONE");
   } else {
     dataBits = frameSize - stopBits - 1 - 1;
-    if (parity == 0)
-      sprintf(s, "PARITY: EVEN");
-    else
-      sprintf(s, "PARITY: ODD");
+    if (parity == 0) {
+//      sprintf(s, "PARITY: EVEN");
+    } else {
+//      sprintf(s, "PARITY: ODD");
+    }
   }
-  Serial.println(s);
+//  Serial.println(s);
   
-  sprintf(s, "DATABITS: %i", dataBits);
-  Serial.println(s);
+//  sprintf(s, "DATABITS: %i", dataBits);
+//  Serial.println(s);
+  
+  reply->bs_reply_data[N_GPIO + index*4 + 0] = dataBits;
+  reply->bs_reply_data[N_GPIO + index*4 + 1] = stopBits;
+  reply->bs_reply_data[N_GPIO + index*4 + 2] = parity;
+  reply->bs_reply_data[N_GPIO + index*4 + 3] = uartInfo[uartSpeedIndex].baudRate;
+  
   return 0;
 }
 
-static void
-UART_all_line_settings_direct()
+static int
+UART_all_line_settings_direct(struct bs_request_s *request, struct bs_reply_s *reply)
 {
   int u = 0;
 
   for (int i = 0; i < N_GPIO; i++) {
     if (gpio[i] > 100) {
-      u++;
-      Serial.printf("--- Trying UART on GPIO %d\n", i);
-      Serial.flush();
+     u++;
+//      Serial.printf("--- Trying UART on GPIO %d\n", i);
+//      Serial.flush();
       for (int attempt = 0; attempt < 50; attempt++) {
         int ret;
         
-         ret = UART_line_settings_direct(i);
+         ret = UART_line_settings_direct(request, reply, i);
          if (ret == 0) {
-          Serial.printf("--- Detected UART line settings.\n");
+//          Serial.printf("--- Detected UART line settings.\n");
           u++;
           break;
         } else {
-          Serial.printf("--- Didn't detect UART. Retrying to be sure.\n");
+//          Serial.printf("--- Didn't detect UART. Retrying to be sure.\n");
           if (ret == -6) { // Timeout
             break;
           }
@@ -338,27 +347,20 @@ UART_all_line_settings_direct()
       }
     }
   }
-  if (u == 0) {
-    Serial.printf("--- Couldn't detect any UART. If you think this is an error, try again.");
-    Serial.printf("--- You might need to pause for some seconds after booting the device under test.\n");
-  }
+  return 0;
 }
 
-void
-UART_all_line_settings()
+int
+UART_all_line_settings(struct bs_request_s *request, struct bs_reply_s *reply)
 {
-  Serial.write('.');
-  Serial.flush();
-  UART_all_line_settings_direct();
-  Serial.write(';');
+  return UART_all_line_settings_direct(request, reply);
 }
 
-void
-data_discovery()
+int
+data_discovery(struct bs_request_s *request, struct bs_reply_s *reply)
 {
   int32_t startTime;
 
-  Serial.print(".");
   startTime = asm_ccount();
   for (int i = 0; i < N_GPIO; i++) {
     if (gpioIndex[i] == D0)
@@ -380,10 +382,9 @@ data_discovery()
       }
     }
   } while ((uint32_t)(asm_ccount() - startTime)/FREQ < (7.5 * 1000000));  
-  Serial.printf("");
+  reply->bs_reply_length = N_GPIO;
   for (int i = 0; i < N_GPIO; i++) {
-    Serial.printf("--- GPIO %s had %i signal changes\n", gpioName[i], gpio[i]);
+    reply->bs_reply_data[i] = gpio[i];
   }
-  Serial.print(";");
-  Serial.flush();
+  return 0;
 }

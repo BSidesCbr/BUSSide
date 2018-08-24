@@ -26,10 +26,10 @@
 // Pattern used for scan() and loopback() tests
 #define PATTERN_LEN              64
 // Use something random when trying find JTAG lines:
-static char pattern[PATTERN_LEN] = "0110011101001101101000010111001001";
+static char mypattern[PATTERN_LEN] = "011001110100110110100001011100100101100111010011010101011010101";
 // Use something more determinate when trying to find
 // length of the DR register:
-//static char pattern[PATTERN_LEN] = "1000000000000000000000000000000000";
+//static char mypattern[PATTERN_LEN] = "1000000000000000000000000000000000";
 
 // Max. number of JTAG enabled chips (MAX_DEV_NR) and length
 // of the DR register together define the number of
@@ -168,7 +168,7 @@ JTAG_ndevices(int tck, int tms, int tdi, int tdo)
   }
 
   nbDevices = i;
-  Serial.printf("There are %d device(s) in the JTAG chain\n", nbDevices);
+//  Serial.printf("There are %d device(s) in the JTAG chain\n", nbDevices);
   return nbDevices;
 }
 
@@ -313,19 +313,21 @@ check_data(char pattern[], int iterations, int tck, int tdi, int tdo, int *reg_l
 static void
 print_pins(int tck, int tms, int tdo, int tdi, int ntrst)
 {
-  if (ntrst != IGNOREPIN) {
-    Serial.print(" ntrst:");
-    Serial.print(pinnames[ntrst]);
-  }
-  Serial.print(" tck:");
-  Serial.print(pinnames[tck]);
-  Serial.print(" tms:");
-  Serial.print(pinnames[tms]);
-  Serial.print(" tdo:");
-  Serial.print(pinnames[tdo]);
-  if (tdi != IGNOREPIN) {
-    Serial.print(" tdi:");
-    Serial.print(pinnames[tdi]);
+  if (VERBOSE) {
+    if (ntrst != IGNOREPIN) {
+      Serial.print(" ntrst:");
+      Serial.print(pinnames[ntrst]);
+    }
+    Serial.print(" tck:");
+    Serial.print(pinnames[tck]);
+    Serial.print(" tms:");
+    Serial.print(pinnames[tms]);
+    Serial.print(" tdo:");
+    Serial.print(pinnames[tdo]);
+    if (tdi != IGNOREPIN) {
+      Serial.print(" tdi:");
+      Serial.print(pinnames[tdi]);
+    }
   }
 }
 
@@ -369,18 +371,18 @@ scan(int *tck_pin, int *tms_pin, int *tdi_pin, int *tdo_pin, int *ntrst_pin)
             }
             init_pins(tck, tms, tdi, ntrst);
             tap_state(TAP_SHIFTIR, tck, tms);
-            checkdataret = check_data(pattern, (2*PATTERN_LEN), tck, tdi, tdo, &reg_len); 
+            checkdataret = check_data(mypattern, (2*PATTERN_LEN), tck, tdi, tdo, &reg_len); 
             if(checkdataret == 1) {
-              Serial.print("--- Found JTAG connection\n");
-              print_pins(tck, tms, tdo, tdi, ntrst);
+//              Serial.print("--- Found JTAG connection\n");
+//              print_pins(tck, tms, tdo, tdi, ntrst);
               *tck_pin = tck;
               *tms_pin = tms;
               *tdo_pin = tdo;
               *tdi_pin = tdi;
               *ntrst_pin = ntrst;
-              retVal = 1;
-              Serial.print(" IR length: ");
-              Serial.println(reg_len, DEC);
+              retVal++;
+//              Serial.print(" IR length: ");
+//              Serial.println(reg_len, DEC);
             }
             else if(checkdataret > 1) {
 #if 0
@@ -428,30 +430,35 @@ loopback_check()
         Serial.print("    ");
       }
       init_pins(IGNOREPIN/*tck*/, IGNOREPIN/*tck*/, pins[tdi], IGNOREPIN /*ntrst*/);
-      checkdataret = check_data(pattern, (2*PATTERN_LEN), IGNOREPIN, tdi, tdo, &reg_len);
+      checkdataret = check_data(mypattern, (2*PATTERN_LEN), IGNOREPIN, tdi, tdo, &reg_len);
       if(checkdataret == 1) {
-        Serial.print("FOUND! ");
-        Serial.print(" tdo:");
-        Serial.print(pinnames[tdo]);
-        Serial.print(" tdi:");
-        Serial.print(pinnames[tdi]);
-        Serial.print(" reglen:");
-        Serial.println(reg_len);
+        if (VERBOSE) {
+          Serial.print("FOUND! ");
+          Serial.print(" tdo:");
+          Serial.print(pinnames[tdo]);
+          Serial.print(" tdi:");
+          Serial.print(pinnames[tdi]);
+          Serial.print(" reglen:");
+          Serial.println(reg_len);
+        }
       }
       else if(checkdataret > 1) {
-        Serial.print("active ");
-        Serial.print(" tdo:");
-        Serial.print(pinnames[tdo]);
-        Serial.print(" tdi:");
-        Serial.print(pinnames[tdi]);
-        Serial.print("  bits toggled:");
-        Serial.println(checkdataret);
+        if (VERBOSE) {
+          Serial.print("active ");
+          Serial.print(" tdo:");
+          Serial.print(pinnames[tdo]);
+          Serial.print(" tdi:");
+          Serial.print(pinnames[tdi]);
+          Serial.print("  bits toggled:");
+          Serial.println(checkdataret);
+        }
       }
       else if(VERBOSE) Serial.println();
     }
   }
 }
 
+#if 0
 static void
 list_pin_names()
 {
@@ -463,6 +470,7 @@ list_pin_names()
   }
   Serial.println();
 }
+#endif
 
 /*
  * Scan TDO for IDCODE. Handle MAX_DEV_NR many devices.
@@ -538,12 +546,14 @@ scan_idcode()
             } /* for(i=0; ...) */
   
             if (i > 0) {
-              print_pins(tck,tms,tdo,tdi,ntrst);
-              Serial.print("  devices: ");
-              Serial.println(i,DEC);
-              for(j = 0; j < i; j++) {
-                Serial.print("  0x");
-                Serial.println(idcodes[j],HEX);
+              if (VERBOSE) {
+                print_pins(tck,tms,tdo,tdi,ntrst);
+                Serial.print("  devices: ");
+                Serial.println(i,DEC);
+                for(j = 0; j < i; j++) {
+                  Serial.print("  0x");
+                  Serial.println(idcodes[j],HEX);
+                }
               }
             } /* if (i > 0) */
           } /* for(tdo=0; ... ) */
@@ -581,26 +591,30 @@ shift_bypass()
 
         init_pins(tck, IGNOREPIN/*tms*/,tdi, IGNOREPIN /*ntrst*/);
         // if bypass is default on start, no need to init TAP state
-        checkdataret = check_data(pattern, (2*PATTERN_LEN), tck, tdi, tdo, &reg_len);
+        checkdataret = check_data(mypattern, (2*PATTERN_LEN), tck, tdi, tdo, &reg_len);
         if(checkdataret == 1) {
-          Serial.print("FOUND! ");
-          Serial.print(" tck:");
-          Serial.print(pinnames[tck]);
-          Serial.print(" tdo:");
-          Serial.print(pinnames[tdo]);
-          Serial.print(" tdi:");
-          Serial.println(pinnames[tdi]);
+          if (VERBOSE) {
+            Serial.print("FOUND! ");
+            Serial.print(" tck:");
+            Serial.print(pinnames[tck]);
+            Serial.print(" tdo:");
+            Serial.print(pinnames[tdo]);
+            Serial.print(" tdi:");
+            Serial.println(pinnames[tdi]);
+          }
         }
         else if(checkdataret > 1) {
-          Serial.print("active ");
-          Serial.print(" tck:");
-          Serial.print(pinnames[tck]);
-          Serial.print(" tdo:");
-          Serial.print(pinnames[tdo]);
-          Serial.print(" tdi:");
-          Serial.print(pinnames[tdi]);
-          Serial.print("  bits toggled:");
-          Serial.println(checkdataret);
+          if (VERBOSE) {
+            Serial.print("active ");
+            Serial.print(" tck:");
+            Serial.print(pinnames[tck]);
+            Serial.print(" tdo:");
+            Serial.print(pinnames[tdo]);
+            Serial.print(" tdi:");
+            Serial.print(pinnames[tdi]);
+            Serial.print("  bits toggled:");
+            Serial.println(checkdataret);
+          }
         }
         else if(VERBOSE) Serial.println();
       }
@@ -661,9 +675,9 @@ sample(int iterations, int tck, int tms, int tdi, int tdo, int ntrst=IGNOREPIN)
     ESP.wdtFeed();
     // no need to set TMS. It's set to the '0' state to 
     // force a Shift DR by the TAP
-    Serial.print(pulse_tdo(tck, tdo),DEC);
-    if (i % 32  == 31 ) Serial.print(" ");
-    if (i % 128 == 127) Serial.println();
+ //   Serial.print(pulse_tdo(tck, tdo),DEC);
+ //   if (i % 32  == 31 ) Serial.print(" ");
+ //   if (i % 128 == 127) Serial.println();
   }
 }
 
@@ -693,14 +707,14 @@ brute_ir(int iterations, int tck, int tms, int tdi, int tdo, int ntrst=IGNOREPIN
       tdo_read = pulse_tdo(tck, tdo);
       if (tdo_read != prevread) iractive++;
       
-      if (iractive || VERBOSE) {
+      if (iractive && VERBOSE) {
         Serial.print(prevread,DEC);
         if (i%16 == 15) Serial.print(" ");
         if (i%128 == 127) Serial.println();
       }
       prevread = tdo_read;
     }
-    if (iractive || VERBOSE) {
+    if (iractive && VERBOSE) {
       Serial.print(prevread,DEC);
       Serial.print("  Ir ");
       Serial.print(ir_buf);
@@ -710,6 +724,7 @@ brute_ir(int iterations, int tck, int tms, int tdi, int tdo, int ntrst=IGNOREPIN
   }
 }
 
+#if 0
 static void
 set_pattern()
 {
@@ -741,18 +756,26 @@ set_pattern()
     }
   }
 }
+#endif
 
-void
-JTAG_scan()
+int
+JTAG_scan(struct bs_request_s *request, struct bs_reply_s *reply)
 {
   int tck, tms, tdo, tdi, ntrst;
+  int rv;
   
-  Serial.write(".");
   loopback_check();
-  if (scan(&tck, &tms, &tdi, &tdo, &ntrst)) {
-   Serial.printf("--- JTAG DETECTED\n");
+  reply->bs_command = BS_REPLY_JTAG_DISCOVER_PINOUT;
+  rv = scan(&tck, &tms, &tdi, &tdo, &ntrst);
+  reply->bs_reply_data[0] = rv;
+  if (rv > 0) {
+   reply->bs_reply_data[1] = tck + 1;
+   reply->bs_reply_data[2] = tms + 1;
+   reply->bs_reply_data[3] = tdi + 1;
+   reply->bs_reply_data[4] = tdo + 1;
+   reply->bs_reply_data[5] = ntrst + 1;
   }
-  Serial.write(";");
+  return 0;
 }
 
 void

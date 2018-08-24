@@ -1,17 +1,30 @@
 #include "BUSSide.h"
 #include <Wire.h>
 
-void
-read_I2C_eeprom()
+int
+read_I2C_eeprom(struct bs_request_s *request, struct bs_reply_s *reply)
 {
-  uint32_t readsize, count;
+  uint32_t readsize, count, skipsize;
   uint8_t slaveAddress;
+  uint8_t *reply_data;
+  uint32_t i;
+  
+  reply->bs_command = BS_REPLY_I2C_FLASH_DUMP;
+  reply_data = (uint8_t *)&reply->bs_reply_data[0];
+  slaveAddress = request->bs_request_args[0];
+  readsize = request->bs_request_args[1];
+  skipsize = request->bs_request_args[2];
+  if (readsize > sizeof(reply->bs_reply_data))
+    return -1;
 
-  Serial.write('.');
-  Serial.flush();
-  slaveAddress = read_u8();
-  readsize = read_size_u32();
-  Wire.begin();  
+  Wire.begin(); 
+  
+  Wire.beginTransmission(slaveAddress);
+  Wire.write((skipsize & 0xff00) >> 8); // send the high byte of the EEPROM memory address
+  Wire.write((skipsize & 0x00ff)); // send the low byte
+  Wire.endTransmission(); 
+
+  i = 0;
   while (readsize > 0) {
     uint32_t gotRead;
     
@@ -23,15 +36,17 @@ read_I2C_eeprom()
         uint8_t data;
       
         data = Wire.read();
-        Serial.write(data);
+        reply_data[i++] = data;
         count++;
       }
       ESP.wdtFeed();
     }
   }
+  reply->bs_reply_length = request->bs_request_args[0];
+  return 0;
 }
 
-
+/*
 void
 I2C_active_scan1(int sdaPin, int sclPin)
 {
@@ -57,18 +72,20 @@ I2C_active_scan()
   }
   Serial.println(";");
 }
+*/
 
-void
-discover_I2C_slaves()
+int
+discover_I2C_slaves(struct bs_request_s *request, struct bs_reply_s *reply)
 {
-  Serial.write('.');
-  Wire.begin();  
+  Wire.begin(); 
+  reply->bs_command = BS_REPLY_I2C_DISCOVER_SLAVES; 
+  reply->bs_reply_length = 0;
   for (int slaveAddress = 0; slaveAddress < 128; slaveAddress++) {
     Wire.beginTransmission(slaveAddress);
     if (Wire.endTransmission() == 0) // if (no errors)
-      Serial.printf("--- Slave address found: 0x%x\n", slaveAddress);
+      reply->bs_reply_data[reply->bs_reply_length++] = slaveAddress;
   }
-  Serial.println(";");
+  return 0;
 }
 
 
