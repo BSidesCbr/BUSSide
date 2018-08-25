@@ -1,5 +1,6 @@
 #include <pins_arduino.h>
 #include "BUSSide.h"
+#include <SoftwareSerial.h>
 
 //#define min(a,b) (((a)<(b))?(a):(b))
 
@@ -386,5 +387,90 @@ data_discovery(struct bs_request_s *request, struct bs_reply_s *reply)
   for (int i = 0; i < N_GPIO; i++) {
     reply->bs_reply_data[i] = gpio[i];
   }
+  return 0;
+}
+
+int
+UART_passthrough(struct bs_request_s *request, struct bs_reply_s *reply)
+{
+  int rxpin, txpin;
+  int baudrate;
+
+  rxpin = request->bs_request_args[0];
+  txpin = request->bs_request_args[1];
+  baudrate = request->bs_request_args[2];
+  SoftwareSerial ser(gpioIndex[rxpin], gpioIndex[txpin]);
+  ser.begin(baudrate);
+  while (1) {
+    ESP.wdtFeed();
+    
+    while (ser.available() > 0) {
+      Serial.write(ser.read());
+      yield();
+    }
+
+    while (Serial.available() > 0) {
+      ser.write(Serial.read());
+      yield();
+    }
+  }
+  return 0;
+}
+
+int
+UART_testtx(SoftwareSerial *ser, int testChar)
+{
+  ser->write(testChar);
+  for (int i = 0; i < 10000; i++) {
+    ESP.wdtFeed();
+    if (ser->available() > 0) {
+      int ch;
+      
+      ch = ser->read();
+      if (ch == testChar)
+        return 1;
+      else
+        return 0;
+    }
+    delay_us(50);
+  }
+  return 0;
+}
+
+int
+UART_discover_tx(struct bs_request_s *request, struct bs_reply_s *reply)
+{
+  int rxpin, txpin;
+  int baudrate;
+ 
+  rxpin = request->bs_request_args[0];
+  baudrate = request->bs_request_args[1];
+  for (txpin = 0; txpin < N_GPIO; txpin++) {
+    int found;
+    
+    ESP.wdtFeed();
+    
+    if (rxpin == txpin)
+      continue;
+      
+    SoftwareSerial ser(gpioIndex[rxpin], gpioIndex[txpin]);
+
+    ser.begin(baudrate);
+    while (ser.available()) {
+      ser.read();
+    }
+    found = 1;
+    for (const char *p = "BS"; *p; p++) {
+      if (UART_testtx(&ser, *p) == 0) {
+        found = 0;
+        break;
+      }
+    }
+    if (found) {
+      reply->bs_reply_data[0] = txpin;
+      return 0;
+    }
+  }
+  reply->bs_reply_data[0] = -1;
   return 0;
 }

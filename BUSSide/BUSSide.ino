@@ -1,10 +1,4 @@
 #include <Boards.h>
-#include <Firmata.h>
-#include <FirmataConstants.h>
-#include <FirmataDefines.h>
-#include <FirmataMarshaller.h>
-#include <FirmataParser.h>
-
 #include <pins_arduino.h>
 #include "BUSSide.h"
 //#include <ESP8266WiFi.h>
@@ -82,6 +76,16 @@ setup()
 static uint32_t sequence_number = 1;
 
 void
+send_reply(int rv, struct bs_request_s *request, struct bs_reply_s *reply)
+{
+    reply->bs_sequence_number = request->bs_sequence_number;
+    if (rv == 0) {
+      reply->bs_checksum = crc_mem((char *)reply, BS_REPLY_SIZE - 4);
+      Serial.write((char *)reply, BS_REPLY_SIZE);
+    }
+}
+
+void
 loop()
 {
     struct bs_request_s request;
@@ -113,13 +117,24 @@ loop()
       rv = data_discovery(&request, &reply);
       break;
 
-    case BS_UART_LINE_SETTINGS:
+    case BS_UART_DISCOVER_RX:
       rv = data_discovery(&request, &reply);
       if (rv != 0)
         break;
       rv = UART_all_line_settings(&request, &reply);
       break;
 
+    case BS_UART_DISCOVER_TX:
+      rv = UART_discover_tx(&request, &reply);
+      break;
+      
+    case BS_UART_PASSTHROUGH:
+      rv = 0;
+      send_reply(0, &request, &reply);
+      (void)UART_passthrough(&request, &reply);
+      // no return
+      break;
+      
     case BS_I2C_DISCOVER_SLAVES:
       rv = discover_I2C_slaves(&request, &reply);
       break;
@@ -150,12 +165,7 @@ loop()
       rv = -1;
       break;
     }
-    
-    reply.bs_sequence_number = request.bs_sequence_number;
-    if (rv == 0) {
-      reply.bs_checksum = crc_mem((char *)&reply, BS_REPLY_SIZE - 4);
-      Serial.write((char *)&reply, BS_REPLY_SIZE);
-    }
-    
+
+    send_reply(rv, &request, &reply);    
     reset_gpios();
 }
