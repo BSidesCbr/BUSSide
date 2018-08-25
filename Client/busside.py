@@ -17,17 +17,19 @@ if len(sys.argv) != 2:
 device = sys.argv[1]
 
 def printHelp():
-    print("spi send <cmd1> ....")
-    print("spi flash readID")
-    print("spi flash dump <size> <outfile>")
-    print("i2c discover slaves")
-    print("i2c flash dump <slaveAddress> <size> <outfile>")
-    print("jtag discover pinout")
-    print("uart discover rx")
-    print("uart discover tx <rx_gpio> <baudrate>")
-    print("uart passthrough <rx_gpio> <tx_gpio> <baudrate>")
-    print("quit")
-    print("")
+    print("+++ The BUSSide accepts the following commands")
+    print("+++")
+    print("+++ > spi send <cmd1> ....")
+    print("+++ > spi flash readID")
+    print("+++ > spi flash dump <size> <outfile>")
+    print("+++ > i2c discover slaves")
+    print("+++ > i2c flash dump <slaveAddress> <size> <outfile>")
+    print("+++ > jtag discover pinout")
+    print("+++ > uart discover rx")
+    print("+++ > uart discover tx <rx_gpio> <baudrate>")
+    print("+++ > uart passthrough <rx_gpio> <tx_gpio> <baudrate>")
+    print("+++ > quit")
+    print("+++")
 
 def doCommand(device, command):
     if command.find("spi ") == 0:
@@ -45,6 +47,13 @@ def doCommand(device, command):
     return 0
 
 bs.sync(device)
+
+print("+++")
+print("+++ Welcome to the BUSSide")
+print("+++ By Dr Silvio Cesare of InfoSect")
+print("+++")
+printHelp()
+print("+++")
 
 while True:
     command = raw_input("> ")

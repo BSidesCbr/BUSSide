@@ -114,6 +114,7 @@ def do_sync(device):
         if saved_sequence_number != seq:
             return -2
         ser.close()
+        print("+++ OK")
         return 0
     except Exception, e:
         print(e)
