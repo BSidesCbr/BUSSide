@@ -1,3 +1,7 @@
 Author: Dr Silvio Cesare of InfoSect
+License: GPLv3
 
 http://busside.com.au
+
+Please install https://github.com/plerup/espsoftwareserial in your Arduino
+libraries.

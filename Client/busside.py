@@ -23,6 +23,9 @@ def printHelp():
     print("i2c discover slaves")
     print("i2c flash dump <slaveAddress> <size> <outfile>")
     print("jtag discover pinout")
+    print("uart discover rx")
+    print("uart discover tx <rx_gpio> <baudrate>")
+    print("uart passthrough <rx_gpio> <tx_gpio> <baudrate>")
     print("quit")
     print("")
 

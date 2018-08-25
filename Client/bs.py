@@ -6,8 +6,44 @@ import os
 import sys
 import serial
 import binascii
+import select
+import tty
+import termios
+import fcntl
 
 sequence_number = 5
+oldterm = 0
+oldflags = 0
+
+def keys_isData():
+    return select.select([sys.stdin], [], [], 0) == ([sys.stdin], [], [])
+
+def keys_init():
+    global oldterm
+    global oldflags
+
+    fd = sys.stdin.fileno()
+    newattr = termios.tcgetattr(fd)
+    newattr[3] = newattr[3] & ~termios.ICANON
+    newattr[3] = newattr[3] & ~termios.ECHO
+    termios.tcsetattr(fd, termios.TCSANOW, newattr)
+
+    oldterm = termios.tcgetattr(fd)
+    oldflags = fcntl.fcntl(fd, fcntl.F_GETFL)
+    fcntl.fcntl(fd, fcntl.F_SETFL, oldflags | os.O_NONBLOCK)
+
+def keys_getchar():
+    if keys_isData():
+        return sys.stdin.read(1)
+    else:
+        return None
+
+def keys_cleanup():
+    global oldterm
+    global oldflags
+
+    termios.tcsetattr(fd, termios.TCSAFLUSH, oldterm)
+    fcntl.fcntl(fd, fcntl.F_SETFL, oldflags)
 
 def get_sequence_number():
     global sequence_number
