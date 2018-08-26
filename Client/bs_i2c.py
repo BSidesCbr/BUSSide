@@ -9,12 +9,14 @@ import struct
 
 BLOCKSIZE=1024
 
-def do_i2c_discover_slaves(device):
+def do_i2c_discover_slaves(device, sda, scl):
     ser = bs.Connect(device)
     print("+++ Sending i2c slave discovery command")
     request_args = list(range(256))
     for i in range(256):
         request_args[i] = 0
+    request_args[0] = sda
+    request_args[1] = scl
     rv = bs.requestreply(ser, 5, 0, request_args)
     if rv is None:
         ser.close()
@@ -29,10 +31,10 @@ def do_i2c_discover_slaves(device):
     ser.close()
     return (bs_reply_length, bs_reply_args)
 
-def i2c_discover_slaves(device):
+def i2c_discover_slaves(device, sda, scl):
     for j in range(10):
         try:
-            rv = do_i2c_discover_slaves(device)
+            rv = do_i2c_discover_slaves(device, sda, scl)
             if rv is not None:
                 return rv
         except Exception, e:
@@ -41,16 +43,50 @@ def i2c_discover_slaves(device):
     print("--- FAILED")
     return None
 
+def do_i2c_discover(device):
+    ser = bs.Connect(device, 30)
+    print("+++ Sending i2c discover pinout command")
+    request_args = list(range(256))
+    for i in range(256):
+        request_args[i] = 0
+    rv = bs.requestreply(ser, 23, 0, request_args)
+    if rv is None:
+        ser.close()
+        return None
+    (bs_reply_length, bs_reply_args) = rv
+
+    n = bs_reply_length
+    print("+++ FOUND %d I2C interfaces" % (n))
+    for i in range(n):
+        sda = bs_reply_args[i*2 + 0]
+        scl = bs_reply_args[i*2 + 1]
+        print("+++ I2C interface FOUND")
+        print("+++ I2C SDA at GPIO %i" % (sda))
+        print("+++ I2C SCL at GPIO %i" % (scl))
+    print("+++ SUCCESS\n")
+    ser.close()
+    return (bs_reply_length, bs_reply_args)
+
+
+
+def i2c_discover(device):
+    for j in range(10):
+        try:
+            rv = do_i2c_discover(device)
+            if rv is not None:
+                return rv
+        except Exception, e:
+            print("+++ %s" % (str(e)))
+        print("--- Warning. Retransmiting Attempt #%d" % (j+1))
+    print("--- FAILED")
+    return None
 
 def doFlashCommand(device, command):
-    if command.find("readID") == 0:
-        doSPIReadID(device)
-        return 0
-    elif command.find("dump ") == 0:
+    if command.find("dump ") == 0:
         args = command[5:].split()
-        if len(args) != 3:
+        if len(args) != 5:
             return None
-        i2c_dump_flash(device, int(args[0]), int(args[1]), args[2])
+        i2c_dump_flash(device, int(args[0]), int(args[1]), int(args[2]), int(args[3]), args[4])
         return 0
     else:
         return None
@@ -59,13 +95,19 @@ def doCommand(device, command):
     if command.find("flash ") == 0:
         doFlashCommand(device, command[6:])
         return 0
-    elif command == "discover slaves":
-        i2c_discover_slaves(device)
+    elif command == "discover pinout":
+        i2c_discover(device)
+        return 0
+    elif command.find("discover slaves ") == 0:
+        args = command[16:].split()
+        if len(args) != 2:
+            return None
+        i2c_discover_slaves(device, int(args[0]), int(args[1]))
         return 0
     else:
         return None
 
-def dumpI2C(ser, slave, size, skip):
+def dumpI2C(ser, sda, scl, slave, size, skip):
         bs_command = struct.pack('<I', 9)
         bs_command_length = struct.pack('<I', 0)
         saved_sequence_number = bs.get_sequence_number()
@@ -73,7 +115,9 @@ def dumpI2C(ser, slave, size, skip):
         bs_request_args  = struct.pack('<I', slave)
         bs_request_args += struct.pack('<I', size)
         bs_request_args += struct.pack('<I', skip)
-        bs_request_args += struct.pack('<I', 0) * 253
+        bs_request_args += struct.pack('<I', sda)
+        bs_request_args += struct.pack('<I', scl)
+        bs_request_args += struct.pack('<I', 0) * 251
         request  = bs_command
         request += bs_command_length
         request += struct.pack('<I', saved_sequence_number)
@@ -118,7 +162,7 @@ def dumpI2C(ser, slave, size, skip):
             return None
         return bigdata[0:size]
 
-def i2c_dump_flash(device, slave, dumpsize, outfile):
+def i2c_dump_flash(device, sda, scl, slave, dumpsize, outfile):
     ser = bs.Connect(device)
     skip = 0
     print("+++ Dumping I2C")
@@ -130,7 +174,7 @@ def i2c_dump_flash(device, slave, dumpsize, outfile):
                 size = BLOCKSIZE
             for j in range(10):
                 try:
-                    data = dumpI2C(ser, slave, size, skip)
+                    data = dumpI2C(ser, sda, scl, slave, size, skip)
                     if data is not None:
                         break
                 except Exception, e:

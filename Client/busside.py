@@ -22,8 +22,9 @@ def printHelp():
     print("+++ > spi send <cmd1> ....")
     print("+++ > spi flash readID")
     print("+++ > spi flash dump <size> <outfile>")
-    print("+++ > i2c discover slaves")
-    print("+++ > i2c flash dump <slaveAddress> <size> <outfile>")
+    print("+++ > i2c discover pinout")
+    print("+++ > i2c discover slaves <sdaPin> <sclPin>")
+    print("+++ > i2c flash dump <sdaPin> <sclPin> <slaveAddress> <size> <outfile>")
     print("+++ > jtag discover pinout")
     print("+++ > uart passthrough auto")
     print("+++ > uart discover rx")
@@ -35,18 +36,17 @@ def printHelp():
 
 def doCommand(device, command):
     if command.find("spi ") == 0:
-        bs_spi.doCommand(device, command[4:])
+        return bs_spi.doCommand(device, command[4:])
     elif command.find("i2c ") == 0:
-        bs_i2c.doCommand(device, command[4:])
+        return bs_i2c.doCommand(device, command[4:])
     elif command.find("uart ") == 0:
-        bs_uart.doCommand(device, command[5:])
+        return bs_uart.doCommand(device, command[5:])
     elif command.find("jtag ") == 0:
-        bs_jtag.doCommand(device, command[5:])
+        return bs_jtag.doCommand(device, command[5:])
     elif command == "quit":
         return -1
     else:
-        printHelp()
-    return 0
+        return None
 
 bs.sync(device)
 
@@ -59,7 +59,10 @@ print("+++")
 
 while True:
     command = raw_input("> ")
-    if doCommand(device, command) is None:
+    rv = doCommand(device, command)
+    if rv is None:
         printHelp()
+    elif rv == -1:
+        break
 
 print("Bye!")
