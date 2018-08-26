@@ -116,7 +116,7 @@ def Connect(device, mytimeout=2):
         FlushInput(ser)
         ser.close() # some weird bug
     except Exception, e:
-        print("+++ ", e)
+        print("+++ %s" % (str(e)))
         ser.close()
         print("*** BUSSide connection error")
         return None

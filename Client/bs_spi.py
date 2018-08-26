@@ -77,7 +77,7 @@ def spi_dump_flash(device, dumpsize, outfile):
                     if data is not None:
                         break
                 except Exception, e:
-                    print("+++ ", e)
+                    print("+++ %s" % (str(e)))
                     pass
                 if j > 5:
                     print("--- Trying a hard reset of the serial device.")

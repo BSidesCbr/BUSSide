@@ -141,7 +141,7 @@ def uart_passthrough(device, rxpin, txpin, baudrate):
             if rv is not None:
                 return rv
         except Exception, e:
-            print("+++ ", e)
+            print("+++ %s" % (str(e)))
         print("--- Warning. Retransmiting Attempt #%d" % (j+1))
     print("--- FAILED")
     return None

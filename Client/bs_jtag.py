@@ -42,7 +42,7 @@ def jtag_discover_pinout(device):
             if rv is not None:
                 return rv
         except Exception, e:
-            print("+++ ", e)
+            print("+++ %s" % (str(e)))
         print("--- Error. Retransmiting Attempt #%d" % (j+1))
     print("--- FAILED")
     return None

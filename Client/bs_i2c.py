@@ -134,7 +134,7 @@ def i2c_dump_flash(device, slave, dumpsize, outfile):
                     if data is not None:
                         break
                 except Exception, e:
-                    print("+++ ", e)
+                    print("+++ %s" % (str(e)))
                 if j > 5:
                     print("--- Trying a hard reset of the serial device.")
                     ser.close()
