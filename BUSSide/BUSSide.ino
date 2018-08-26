@@ -142,7 +142,11 @@ loop()
     case BS_I2C_FLASH_DUMP:
       rv = read_I2C_eeprom(&request, &reply);
       break;
-          
+
+    case BS_I2C_DISCOVER:
+      rv = I2C_active_scan(&request, &reply);
+      break;
+      
     case BS_SPI_FLASH_DUMP:
       rv = read_SPI_flash(&request, &reply);
       break;  

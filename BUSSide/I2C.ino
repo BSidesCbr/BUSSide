@@ -8,6 +8,7 @@ read_I2C_eeprom(struct bs_request_s *request, struct bs_reply_s *reply)
   uint8_t slaveAddress;
   uint8_t *reply_data;
   uint32_t i;
+  int sdaPin, sclPin;
   
   reply->bs_command = BS_REPLY_I2C_FLASH_DUMP;
   reply_data = (uint8_t *)&reply->bs_reply_data[0];
@@ -16,8 +17,10 @@ read_I2C_eeprom(struct bs_request_s *request, struct bs_reply_s *reply)
   skipsize = request->bs_request_args[2];
   if (readsize > sizeof(reply->bs_reply_data))
     return -1;
+  sdaPin = request->bs_request_args[3] - 1;
+  sclPin = request->bs_request_args[4] - 1;
 
-  Wire.begin(); 
+  Wire.begin(gpioIndex[sdaPin], gpioIndex[sclPin]);  
   
   Wire.beginTransmission(slaveAddress);
   Wire.write((skipsize & 0xff00) >> 8); // send the high byte of the EEPROM memory address
@@ -46,44 +49,58 @@ read_I2C_eeprom(struct bs_request_s *request, struct bs_reply_s *reply)
   return 0;
 }
 
-/*
-void
-I2C_active_scan1(int sdaPin, int sclPin)
+static void
+I2C_active_scan1(struct bs_request_s *request, struct bs_reply_s *reply, int sdaPin, int sclPin)
 {
-  Wire.begin(pins[sdaPin], pins[sdaPin]);  
+  Wire.begin(gpioIndex[sdaPin], gpioIndex[sclPin]);  
   for (int slaveAddress = 0; slaveAddress < 128; slaveAddress++) {
+    int rv1, rv2;
+
+    ESP.wdtFeed();
     Wire.beginTransmission(slaveAddress);
-    if (Wire.endTransmission() == 0) // if (no errors)
-      Serial.printf("Slave address found: 0x%x (sda=%s scl=%s)\n", slaveAddress, pinnames[sdaPin], pinnames[sclPin]);
+    if (Wire.endTransmission() == 0) {
+      int index;
+
+      index = reply->bs_reply_length;
+      reply->bs_reply_data[2*index + 0] = sdaPin + 1;
+      reply->bs_reply_data[2*index + 1] = sclPin + 1;
+      reply->bs_reply_length++;
+    }
   }
 }
 
-void
-I2C_active_scan()
+int
+I2C_active_scan(struct bs_request_s *request, struct bs_reply_s *reply)
 {
-  Serial.write('.');
-  for (int sda_pin=0; sda_pin < pinslen; sda_pin++) {
+  reply->bs_reply_length = 0;
+  for (int sda_pin=1; sda_pin < N_GPIO; sda_pin++) {
     ESP.wdtFeed();
-    for(int scl_pin = 0; scl_pin < pinslen; scl_pin++) {
+    for(int scl_pin = 1; scl_pin < N_GPIO; scl_pin++) {
       ESP.wdtFeed();
-      if(sda_pin == scl_pin) continue;
-      I2C_active_scan1(sda_pin, scl_pin);
+      if (sda_pin == scl_pin)
+        continue;
+      I2C_active_scan1(request, reply, sda_pin, scl_pin);
     }
   }
-  Serial.println(";");
+  return 0;
 }
-*/
 
 int
 discover_I2C_slaves(struct bs_request_s *request, struct bs_reply_s *reply)
 {
-  Wire.begin(); 
+  int sdaPin, sclPin;
+
+  sdaPin = request->bs_request_args[0] - 1;
+  sclPin = request->bs_request_args[1] - 1;
+  Wire.begin(gpioIndex[sdaPin], gpioIndex[sclPin]);  
   reply->bs_command = BS_REPLY_I2C_DISCOVER_SLAVES; 
   reply->bs_reply_length = 0;
   for (int slaveAddress = 0; slaveAddress < 128; slaveAddress++) {
+    ESP.wdtFeed();
     Wire.beginTransmission(slaveAddress);
-    if (Wire.endTransmission() == 0) // if (no errors)
+    if (Wire.endTransmission() == 0) { // if (no errors)
       reply->bs_reply_data[reply->bs_reply_length++] = slaveAddress;
+    }
   }
   return 0;
 }

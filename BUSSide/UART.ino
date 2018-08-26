@@ -241,7 +241,7 @@ static int dataBits;
 static int parity;
 static float bitTime;
 
-#define NWIDTHS 100
+#define NWIDTHS 200
 
 static int
 UART_line_settings_direct(struct bs_request_s *request, struct bs_reply_s *reply, int index)
@@ -443,9 +443,9 @@ UART_discover_tx(struct bs_request_s *request, struct bs_reply_s *reply)
   int rxpin, txpin;
   int baudrate;
  
-  rxpin = request->bs_request_args[0];
+  rxpin = request->bs_request_args[0] - 1;
   baudrate = request->bs_request_args[1];
-  for (txpin = 0; txpin < N_GPIO; txpin++) {
+  for (txpin = 1; txpin < N_GPIO; txpin++) {
     int found;
     
     ESP.wdtFeed();

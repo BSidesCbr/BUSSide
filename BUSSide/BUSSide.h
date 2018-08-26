@@ -58,6 +58,8 @@ asm_ccount(void)
 #define BS_REPLY_UART_PASSTHROUGH       20
 #define BS_UART_DISCOVER_TX             21
 #define BS_REPLY_UART_DISCOVER_TX       22
+#define BS_I2C_DISCOVER                 23
+#define BS_REPLY_I2C_DISCOVER           24
 
 #define BS_REQUEST_SIZE (4 + 4 + 4 + 4*256 + 4)
 #define BS_REPLY_SIZE (BS_REQUEST_SIZE)

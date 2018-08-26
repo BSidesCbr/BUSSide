@@ -14,7 +14,7 @@ def do_uart_tx(device, rxpin, baudrate):
         request_args = list(range(256))
         for i in range(256):
             request_args[i] = 0
-        request_args[0] = rxpin - 1
+        request_args[0] = rxpin
         request_args[1] = baudrate
         rv = bs.requestreply(ser, 21, 0, request_args)
         if rv is None:
@@ -158,8 +158,11 @@ def uart_passthrough_auto(device):
                 stopbits = bs_reply_args[ngpio + 4*i + 1]
                 parity = bs_reply_args[ngpio + 4*i + 2]
                 baudrate = bs_reply_args[ngpio + 4*i + 3]
-                rxpin = i+1
+                rxpin = i + 1
                 uartcount = uartcount + 1
+    if uartcount == 0:
+        print("+++ NOT FOUND")
+        return 0
     if uartcount > 1:
         print("+++ More than 1 UART device found.")
         print("+++ You will need to do tx discovery and passthrough manually.")
