@@ -25,9 +25,11 @@ def printHelp():
     print("+++ > i2c discover slaves")
     print("+++ > i2c flash dump <slaveAddress> <size> <outfile>")
     print("+++ > jtag discover pinout")
+    print("+++ > uart passthrough auto")
     print("+++ > uart discover rx")
     print("+++ > uart discover tx <rx_gpio> <baudrate>")
     print("+++ > uart passthrough <rx_gpio> <tx_gpio> <baudrate>")
+    print("+++ > help")
     print("+++ > quit")
     print("+++")
 
@@ -57,7 +59,7 @@ print("+++")
 
 while True:
     command = raw_input("> ")
-    if doCommand(device, command) < 0:
-        break
+    if doCommand(device, command) is None:
+        printHelp()
 
 print("Bye!")

@@ -61,7 +61,54 @@ def FlushInput(ser):
         if len(ch) != 1:
             return
 
-def do_sync(device):
+def requestreply(ser, command, command_length, request_args):
+    bs_command = struct.pack('<I', command)
+    bs_command_length = struct.pack('<I', command_length)
+    bs_request_args = ""
+    for i in range(256):
+        bs_request_args += struct.pack('<I', request_args[i])
+    request  = bs_command
+    request += bs_command_length
+    saved_sequence_number = get_sequence_number()
+    next_sequence_number()
+    request += struct.pack('<I', saved_sequence_number)
+    request += bs_request_args
+    crc = binascii.crc32(request)
+    request += struct.pack('<i', crc)
+    ser.write(request)
+    bs_command = ser.read(4)
+    if len(bs_command) != 4:
+        return None
+    bs_reply_length = ser.read(4)
+    if len(bs_reply_length) != 4:
+        return None
+    bs_sequence_number = ser.read(4)
+    if len(bs_sequence_number) != 4:
+        return None
+    reply  = bs_command
+    reply += bs_reply_length
+    reply += bs_sequence_number
+    bs_reply_length, = struct.unpack('<I', bs_reply_length)
+    bs_reply_args = list(range(256))
+    for i in range(256):
+        s = ser.read(4)
+        if len(s) != 4:
+            return None
+        reply += s
+        bs_reply_args[i], = struct.unpack('<I', s)
+    d = ser.read(4)
+    if len(d) != 4:
+        return None
+    bs_checksum, = struct.unpack('<i', d)
+    crc = binascii.crc32(reply)
+    if crc != bs_checksum:
+        return None
+    seq, = struct.unpack('<I', bs_sequence_number)
+    if saved_sequence_number != seq:
+        return None
+    return (bs_reply_length, bs_reply_args)
+
+def Connect(device, mytimeout=2):
     print("+++ Connecting to the BUSSide")
     try:
         ser = serial.Serial(device, 500000, timeout=2)
@@ -69,69 +116,48 @@ def do_sync(device):
         FlushInput(ser)
         ser.close() # some weird bug
     except Exception, e:
-        print(e)
+        print("+++ ", e)
         ser.close()
         print("*** BUSSide connection error")
-        return -1
+        return None
     try:
-        ser = serial.Serial(device, 500000, timeout=2)
+        ser = serial.Serial(device, 500000, timeout=mytimeout)
         FlushInput(ser)
     except Exception, e:
-        print(e)
+        print("+++ %s" % (str(e)))
         ser.close()
         print("*** BUSSide connection error")
-        return -1
+        return None
+    return ser
+
+def do_sync(device):
+    ser = Connect(device)
     print("+++ Sending echo command")
     try:
-        bs_command = struct.pack('<I', 0)
-        bs_command_length = struct.pack('<I', 0)
-        bs_request_args = struct.pack('<I', 0) * 256
-        request  = bs_command
-        request += bs_command_length
-        saved_sequence_number = get_sequence_number()
-        next_sequence_number()
-        request += struct.pack('<I', saved_sequence_number)
-        request += bs_request_args
-        crc = binascii.crc32(request)
-        request += struct.pack('<i', crc)
-        ser.write(request)
-        bs_command = ser.read(4)
-        bs_reply_length = ser.read(4)
-        bs_sequence_number = ser.read(4)
-        reply  = bs_command
-        reply += bs_reply_length
-        reply += bs_sequence_number
-        bs_reply_args = list(range(256))
+        request_args = list(range(256))
         for i in range(256):
-            s = ser.read(4)
-            reply += s
-            bs_reply_args[i], = struct.unpack('<I', s)
-        bs_checksum, = struct.unpack('<i', ser.read(4))
-        crc = binascii.crc32(reply)
-        if crc != bs_checksum:
-            return -1
-        seq, = struct.unpack('<I', bs_sequence_number)
-        if saved_sequence_number != seq:
-            return -2
-        ser.close()
+            request_args[i] = 0
+        rv = requestreply(ser, 0, 0, request_args)
+        if rv is None:
+            ser.close()
+            return None
+        (bs_reply_length, bs_reply_args) = rv
         print("+++ OK")
-        return 0
+        return rv
     except Exception, e:
-        print(e)
+        print("+++ %s" % (str(e)))
         ser.close()
-        return -1
+        return None
 
 def sync(device):
     for j in range(10):
         try:
-            rv = -2
-            while rv == -2:
-                rv = do_sync(device)
-                if rv == 0:
-                    return 0
+            rv = do_sync(device)
+            if rv is not None:
+                return rv 
         except Exception, e:
-            print(e)
+            print("+++ %s" % (str(e)))
         print("--- Warning. Retransmiting Attempt #%d" % (j+1))
         time.sleep(2)
-    return -1
+    return None
 

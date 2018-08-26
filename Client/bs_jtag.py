@@ -8,54 +8,17 @@ import sys
 import struct
 
 def do_jtag_discover_pinout(device):
-    print("+++ Connecting to the BUSSide")
-    try:
-        ser = serial.Serial(device, 500000, timeout=2)
-        print("+++ Initiating comms");
-        bs.FlushInput(ser)
-        ser.close() # some weird bug
-    except Exception, e:
-        ser.close()
-        print("*** BUSSide connection error")
-        return -1
-    try:
-        ser = serial.Serial(device, 500000, timeout=30)
-        bs.FlushInput(ser)
-    except Exception, e:
-        ser.close()
-        print("*** BUSSide connection error")
-        return -1
+    ser = bs.Connect(device, 30)
     print("+++ Sending jtag pinout discovery command")
-    bs_command = struct.pack('<I', 13)
-    bs_command_length = struct.pack('<I', 0)
-    bs_request_args = struct.pack('<I', 0) * 256
-    request  = bs_command
-    request += bs_command_length
-    saved_sequence_number = bs.get_sequence_number()
-    bs.next_sequence_number()
-    request += struct.pack('<I', saved_sequence_number)
-    request += bs_request_args
-    crc = binascii.crc32(request)
-    request += struct.pack('<i', crc)
-    ser.write(request)
-    bs_command = ser.read(4)
-    bs_reply_length = ser.read(4)
-    bs_sequence_number = ser.read(4)
-    reply  = bs_command
-    reply += bs_reply_length
-    reply += bs_sequence_number
-    bs_reply_args = list(range(256))
+
+    request_args = list(range(256))
     for i in range(256):
-        s = ser.read(4)
-        reply += s
-        bs_reply_args[i], = struct.unpack('<I', s)
-    bs_checksum, = struct.unpack('<i', ser.read(4))
-    crc = binascii.crc32(reply)
-    if crc != bs_checksum:
-        return -1
-    seq, = struct.unpack('<I', bs_sequence_number)
-    if saved_sequence_number != seq:
-        return -2
+        request_args[i] = 0
+    rv = bs.requestreply(ser, 13, 0, request_args)
+    if rv is None:
+        ser.close()
+        return None
+    (bs_reply_length, bs_reply_args) = rv
     if bs_reply_args[0] != 0:
         tck = bs_reply_args[1]
         tms = bs_reply_args[2]
@@ -70,22 +33,23 @@ def do_jtag_discover_pinout(device):
         print("+++ NTRST %i" % (ntrst))
     print("+++ SUCCESS")
     ser.close()
-    return 0
+    return (bs_reply_length, bs_reply_args)
 
 def jtag_discover_pinout(device):
     for j in range(10):
         try:
-            rv = -2
-            while rv == -2:
-                rv = do_jtag_discover_pinout(device)
-                if rv == 0:
-                    return 0
+            rv = do_jtag_discover_pinout(device)
+            if rv is not None:
+                return rv
         except Exception, e:
-            print(e)
+            print("+++ ", e)
         print("--- Error. Retransmiting Attempt #%d" % (j+1))
     print("--- FAILED")
-    return -1
+    return None
 
 def doCommand(device, command):
     if command == "discover pinout":
-        return jtag_discover_pinout(device)
+        jtag_discover_pinout(device)
+        return 0
+    else:
+        return None

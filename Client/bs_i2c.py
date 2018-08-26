@@ -10,92 +10,60 @@ import struct
 BLOCKSIZE=1024
 
 def do_i2c_discover_slaves(device):
-    print("+++ Connecting to the BUSSide")
-    try:
-        ser = serial.Serial(device, 500000, timeout=2)
-	print("+++ Initiating comms");
-	bs.FlushInput(ser)
-	ser.close() # some weird bug
-    except Exception, e:
-        ser.close()
-        print("*** BUSSide connection error")
-        return -1
-    try:
-        ser = serial.Serial(device, 500000, timeout=2)
-        bs.FlushInput(ser)
-    except Exception, e:
-        ser.close()
-        print("*** BUSSide connection error")
-        return -1
+    ser = bs.Connect(device)
     print("+++ Sending i2c slave discovery command")
-    bs_command = struct.pack('<I', 5)
-    bs_command_length = struct.pack('<I', 0)
-    bs_request_args = struct.pack('<I', 0) * 256
-    request  = bs_command
-    request += bs_command_length
-    saved_sequence_number = bs.get_sequence_number()
-    bs.next_sequence_number()
-    request += struct.pack('<I', saved_sequence_number)
-    request += bs_request_args
-    crc = binascii.crc32(request)
-    request += struct.pack('<i', crc)
-    ser.write(request)
-    bs_command = ser.read(4)
-    bs_reply_length = ser.read(4)
-    bs_sequence_number = ser.read(4)
-    reply  = bs_command
-    reply += bs_reply_length
-    reply += bs_sequence_number
-    bs_reply_args = list(range(256))
+    request_args = list(range(256))
     for i in range(256):
-        s = ser.read(4)
-        reply += s
-        bs_reply_args[i], = struct.unpack('<I', s)
-    bs_checksum, = struct.unpack('<i', ser.read(4))
-    crc = binascii.crc32(reply)
-    if crc != bs_checksum:
-        return -1
-    seq, = struct.unpack('<I', bs_sequence_number)
-    if saved_sequence_number != seq:
-        return -2
-    nslave_addresses, = struct.unpack('<I', bs_reply_length)
+        request_args[i] = 0
+    rv = bs.requestreply(ser, 5, 0, request_args)
+    if rv is None:
+        ser.close()
+        return None
+    (bs_reply_length, bs_reply_args) = rv
+
+    nslave_addresses = bs_reply_length
     print("+++ %d I2C slave addresses" % (nslave_addresses))
     for i in range(nslave_addresses):
         print("+++ I2C slave address FOUND at %i" % bs_reply_args[i])
     print("+++ SUCCESS\n")
     ser.close()
-    return 0
+    return (bs_reply_length, bs_reply_args)
 
 def i2c_discover_slaves(device):
     for j in range(10):
         try:
-            rv = -2
-            while rv == -2:
-                rv = do_i2c_discover_slaves(device)
-                if rv == 0:
-                    return 0
+            rv = do_i2c_discover_slaves(device)
+            if rv is not None:
+                return rv
         except Exception, e:
-            print(e)
+            print("+++ %s" % (str(e)))
         print("--- Warning. Retransmiting Attempt #%d" % (j+1))
     print("--- FAILED")
-    return -1
+    return None
 
 
 def doFlashCommand(device, command):
     if command.find("readID") == 0:
         doSPIReadID(device)
+        return 0
     elif command.find("dump ") == 0:
         args = command[5:].split()
         if len(args) != 3:
-            return -1
+            return None
         i2c_dump_flash(device, int(args[0]), int(args[1]), args[2])
+        return 0
+    else:
+        return None
 
 def doCommand(device, command):
     if command.find("flash ") == 0:
-        return doFlashCommand(device, command[6:])
+        doFlashCommand(device, command[6:])
+        return 0
     elif command == "discover slaves":
-        return i2c_discover_slaves(device)
-
+        i2c_discover_slaves(device)
+        return 0
+    else:
+        return None
 
 def dumpI2C(ser, slave, size, skip):
         bs_command = struct.pack('<I', 9)
@@ -114,8 +82,14 @@ def dumpI2C(ser, slave, size, skip):
         request += struct.pack('<i', crc)
         ser.write(request)
         bs_command = ser.read(4)
+        if len(bs_command) != 4:
+            return None
         bs_reply_length = ser.read(4)
+        if len(bs_reply_length) != 4:
+            return None
         bs_sequence_number = ser.read(4)
+        if len(bs_sequence_number) != 4:
+            return None
         bigdata = ""
         count = 0
         while True:
@@ -129,6 +103,8 @@ def dumpI2C(ser, slave, size, skip):
                     return None
                 count = count + 1
         bs_checksum = ser.read(4)
+        if len(bs_checksum) != 4:
+            return None
         bs_checksum, = struct.unpack('<i', bs_checksum)
         reply  = bs_command
         reply += bs_reply_length
@@ -143,21 +119,7 @@ def dumpI2C(ser, slave, size, skip):
         return bigdata[0:size]
 
 def i2c_dump_flash(device, slave, dumpsize, outfile):
-    print("+++ Connecting to the BUSSide")
-    try:
-        ser = serial.Serial(device, 500000, timeout=2)
-        bs.FlushInput(ser)
-        ser.close() # some weird bug
-    except Exception, e:
-        ser.close()
-    try:
-        ser = serial.Serial(device, 500000, timeout=2)
-        print("+++ Initiating comms");
-        bs.FlushInput(ser)
-    except Exception, e:
-        ser.close()
-        print("*** BUSSide connection error")
-        return -1
+    ser = bs.Connect(device)
     skip = 0
     print("+++ Dumping I2C")
     with open(outfile, 'wb') as f:
@@ -172,8 +134,7 @@ def i2c_dump_flash(device, slave, dumpsize, outfile):
                     if data is not None:
                         break
                 except Exception, e:
-                    print(e)
-                    pass
+                    print("+++ ", e)
                 if j > 5:
                     print("--- Trying a hard reset of the serial device.")
                     ser.close()
@@ -189,4 +150,4 @@ def i2c_dump_flash(device, slave, dumpsize, outfile):
             skip = skip + BLOCKSIZE
             dumpsize = dumpsize - size 
         print("+++ SUCCESS\n")
-        return 0
+        return (1, 1)
