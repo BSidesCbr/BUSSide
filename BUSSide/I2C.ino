@@ -49,8 +49,7 @@ read_I2C_eeprom(struct bs_request_s *request, struct bs_reply_s *reply)
   return 0;
 }
 
-static void
-I2C_active_scan1(struct bs_request_s *request, struct bs_reply_s *reply, int sdaPin, int sclPin)
+static void I2C_active_scan1(struct bs_request_s *request, struct bs_reply_s *reply, int sdaPin, int sclPin)
 {
   Wire.begin(gpioIndex[sdaPin], gpioIndex[sclPin]);  
   for (int slaveAddress = 0; slaveAddress < 128; slaveAddress++) {
@@ -104,5 +103,3 @@ discover_I2C_slaves(struct bs_request_s *request, struct bs_reply_s *reply)
   }
   return 0;
 }
-
-

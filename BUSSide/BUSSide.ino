@@ -81,7 +81,7 @@ send_reply(int rv, struct bs_request_s *request, struct bs_reply_s *reply)
     reply->bs_sequence_number = request->bs_sequence_number;
     if (rv == 0) {
       reply->bs_checksum = crc_mem((char *)reply, BS_REPLY_SIZE - 4);
-      Serial.write((char *)reply, BS_REPLY_SIZE);
+      Serial.write((const unsigned char *)reply, BS_REPLY_SIZE);
     }
 }
 

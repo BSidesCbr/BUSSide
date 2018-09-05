@@ -1,8 +1,23 @@
 #ifndef BUSSIDE_H
 #define BUSSIDE_H
 
+// Doesn't compile if included in UART
+#include <SoftwareSerial.h>
+
 #define FREQ 160
 #define N_GPIO 9
+
+typedef void prog_void;
+typedef char prog_char;
+typedef unsigned char prog_uchar;
+typedef int8_t prog_int8_t;
+typedef uint8_t prog_uint8_t;
+typedef int16_t prog_int16_t;
+typedef uint16_t prog_uint16_t;
+typedef int32_t prog_int32_t;
+typedef uint32_t prog_uint32_t;
+typedef int64_t prog_int64_t;
+typedef uint64_t prog_uint64_t;
 
 unsigned long crc_update(unsigned long crc, byte data);
 unsigned long crc_mem(char *s, int n);
