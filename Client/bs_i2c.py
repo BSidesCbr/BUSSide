@@ -8,6 +8,7 @@ import sys
 import struct
 
 BLOCKSIZE=1024
+WRITEBLOCKSIZE=512
 
 def do_i2c_discover_slaves(device, sda, scl):
     ser = bs.Connect(device)
@@ -84,9 +85,15 @@ def i2c_discover(device):
 def doFlashCommand(device, command):
     if command.find("dump ") == 0:
         args = command[5:].split()
-        if len(args) != 5:
+        if len(args) != 6:
             return None
-        i2c_dump_flash(device, int(args[0]), int(args[1]), int(args[2]), int(args[3]), args[4])
+        i2c_dump_flash(device, int(args[0]), int(args[1]), int(args[2]), int(args[3]), int(args[4]), args[5])
+        return 0
+    elif command.find("write ") == 0:
+        args = command[6:].split()
+        if len(args) != 6:
+            return None
+        i2c_write_flash(device, int(args[0]), int(args[1]), int(args[2]), int(args[3]), int(args[4]), args[5])
         return 0
     else:
         return None
@@ -107,7 +114,22 @@ def doCommand(device, command):
     else:
         return None
 
-def dumpI2C(ser, sda, scl, slave, size, skip):
+def writeI2C(ser, sda, scl, slave, size, skip, alen, data):
+    request_args = list(range(256))
+    for i in range(256):
+        request_args[i] = 0
+    request_args[0] = slave
+    request_args[1] = size
+    request_args[2] = skip
+    request_args[3] = sda
+    request_args[4] = scl
+    request_args[5] = alen
+    for i in range(size / 4):
+        request_args[6 + i] = data[i]
+    rv = bs.requestreply(ser, 25, 0, request_args)
+    return rv
+
+def dumpI2C(ser, sda, scl, slave, size, skip, alen):
         bs_command = struct.pack('<I', 9)
         bs_command_length = struct.pack('<I', 0)
         saved_sequence_number = bs.get_sequence_number()
@@ -117,7 +139,8 @@ def dumpI2C(ser, sda, scl, slave, size, skip):
         bs_request_args += struct.pack('<I', skip)
         bs_request_args += struct.pack('<I', sda)
         bs_request_args += struct.pack('<I', scl)
-        bs_request_args += struct.pack('<I', 0) * 251
+        bs_request_args += struct.pack('<I', alen)
+        bs_request_args += struct.pack('<I', 0) * 250
         request  = bs_command
         request += bs_command_length
         request += struct.pack('<I', saved_sequence_number)
@@ -162,7 +185,7 @@ def dumpI2C(ser, sda, scl, slave, size, skip):
             return None
         return bigdata[0:size]
 
-def i2c_dump_flash(device, sda, scl, slave, dumpsize, outfile):
+def i2c_dump_flash(device, sda, scl, slave, alen, dumpsize, outfile):
     ser = bs.Connect(device)
     skip = 0
     print("+++ Dumping I2C")
@@ -174,7 +197,7 @@ def i2c_dump_flash(device, sda, scl, slave, dumpsize, outfile):
                 size = BLOCKSIZE
             for j in range(10):
                 try:
-                    data = dumpI2C(ser, sda, scl, slave, size, skip)
+                    data = dumpI2C(ser, sda, scl, slave, size, skip, alen)
                     if data is not None:
                         break
                 except Exception, e:
@@ -195,3 +218,45 @@ def i2c_dump_flash(device, sda, scl, slave, dumpsize, outfile):
             dumpsize = dumpsize - size 
         print("+++ SUCCESS\n")
         return (1, 1)
+
+def i2c_write_flash(device, sda, scl, slave, alen, dumpsize, infile):
+    ser = bs.Connect(device, 5)
+    skip = 0
+    print("+++ Writing I2C")
+    with open(infile, 'rb') as f:
+        while dumpsize > 0:
+            if dumpsize < WRITEBLOCKSIZE:
+                size = dumpsize
+            else:
+                size = WRITEBLOCKSIZE
+            f.seek(skip)
+            rawdata = f.read(size)
+            data = list(range(size/4))
+            for i in range(size/4):
+                a = ord(rawdata[4*i + 0])
+                b = ord(rawdata[4*i + 1])
+                c = ord(rawdata[4*i + 2])
+                d = ord(rawdata[4*i + 3])
+                data[i] = (d << 24) + (c << 16) + (b << 8) + a
+            for j in range(10):
+                try:
+                    rv = writeI2C(ser, sda, scl, slave, size, skip, alen, data)
+                    if rv is not None:
+                        break
+                except Exception, e:
+                    print("+++ %s" % (str(e)))
+                if j > 5:
+                    print("--- Trying a hard reset of the serial device.")
+                    ser.close()
+                    time.sleep(1)
+                    ser = serial.Serial(device, 500000, timeout=2)
+                    bs.FlushInput(ser)
+                print("--- Warning. Retransmiting Attempt #%d" % (j+1))
+            if data is None:
+                print("Timeout")
+                raise "Timeout"
+            skip = skip + WRITEBLOCKSIZE
+            dumpsize = dumpsize - size 
+        print("+++ SUCCESS\n")
+        return (1, 1)
+

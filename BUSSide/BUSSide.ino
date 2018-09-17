@@ -15,7 +15,7 @@ byte pins[] = { D0, D1, D2, D3, D4, D5, D6, D7, D8 };
 char * pinnames[] = { "D0", "D1", "D2", "D3", "D4", "D5", "D6", "D7", "D8", };
 const byte pinslen = sizeof(pins)/sizeof(pins[0]);  
 
-static  prog_uint32_t crc_table[16] = {
+static uint32_t crc_table[16] = {
     0x00000000, 0x1db71064, 0x3b6e20c8, 0x26d930ac,
     0x76dc4190, 0x6b6b51f4, 0x4db26158, 0x5005713c,
     0xedb88320, 0xf00f9344, 0xd6d6a3e8, 0xcb61b38c,
@@ -143,6 +143,10 @@ loop()
       rv = read_I2C_eeprom(&request, &reply);
       break;
 
+    case BS_I2C_FLASH:
+      rv = write_I2C_eeprom(&request, &reply);
+      break;
+      
     case BS_I2C_DISCOVER:
       rv = I2C_active_scan(&request, &reply);
       break;

@@ -15,6 +15,7 @@ int UART_discover_tx(struct bs_request_s *request, struct bs_reply_s *reply);
 int discover_I2C_slaves(struct bs_request_s *request, struct bs_reply_s *reply);
 int I2C_active_scan(struct bs_request_s *request, struct bs_reply_s *reply);
 int read_I2C_eeprom(struct bs_request_s *request, struct bs_reply_s *reply);
+int write_I2C_eeprom(struct bs_request_s *request, struct bs_reply_s *reply);
 int read_SPI_flash(struct bs_request_s *request, struct bs_reply_s *reply);
 int JTAG_scan(struct bs_request_s *request, struct bs_reply_s *reply);
 int SPI_read_id(struct bs_request_s *request, struct bs_reply_s *reply);
@@ -60,6 +61,8 @@ asm_ccount(void)
 #define BS_REPLY_UART_DISCOVER_TX       22
 #define BS_I2C_DISCOVER                 23
 #define BS_REPLY_I2C_DISCOVER           24
+#define BS_I2C_FLASH                    25
+#define BS_REPLY_I2C_FLASH              26
 
 #define BS_REQUEST_SIZE (4 + 4 + 4 + 4*256 + 4)
 #define BS_REPLY_SIZE (BS_REQUEST_SIZE)
