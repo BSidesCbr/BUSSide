@@ -8,6 +8,7 @@ unsigned long crc_update(unsigned long crc, byte data);
 unsigned long crc_mem(char *s, int n);
 void delay_us(int us);
 
+int spi_command_finder(struct bs_request_s *request, struct bs_reply_s *reply);
 int send_SPI_command(struct bs_request_s *request, struct bs_reply_s *reply);
 int data_discovery(struct bs_request_s *request, struct bs_reply_s *reply);
 int UART_all_line_settings(struct bs_request_s *request, struct bs_reply_s *reply);
@@ -20,6 +21,10 @@ int read_SPI_flash(struct bs_request_s *request, struct bs_reply_s *reply);
 int JTAG_scan(struct bs_request_s *request, struct bs_reply_s *reply);
 int SPI_read_id(struct bs_request_s *request, struct bs_reply_s *reply);
 int UART_passthrough(struct bs_request_s *request, struct bs_reply_s *reply);
+int erase_sector_SPI_flash(struct bs_request_s *request, struct bs_reply_s *reply);
+int spi_discover(struct bs_request_s *request, struct bs_reply_s *reply);
+int spi_read_id_bb(struct bs_request_s *request, struct bs_reply_s *reply);
+int read_SPI_flash_bitbang(struct bs_request_s *request, struct bs_reply_s *reply);
 
 extern byte pins[];
 extern char *pinnames[];
@@ -63,6 +68,16 @@ asm_ccount(void)
 #define BS_REPLY_I2C_DISCOVER           24
 #define BS_I2C_FLASH                    25
 #define BS_REPLY_I2C_FLASH              26
+#define BS_SPI_ERASE_SECTOR             27
+#define BS_REPLY_SPI_ERASE_SECTOR       28
+#define BS_SPI_DISCOVER_PINOUT          29
+#define BS_REPLY_SPI_DISCOVER_PINOUT    30
+#define BS_SPI_BB_READID                31
+#define BS_REPLY_BB_READID              32
+#define BS_SPI_BB_SPI_FLASH_DUMP        33
+#define BS_REPY_SPI_BB_SPI_FLASH_DUMP   34
+#define BS_SPI_COMMAND_FINDER           35
+#define BS_REPLY_SPI_COMMAND_FINDER     36
 
 #define BS_REQUEST_SIZE (4 + 4 + 4 + 4*256 + 4)
 #define BS_REPLY_SIZE (BS_REQUEST_SIZE)

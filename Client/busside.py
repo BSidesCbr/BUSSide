@@ -19,8 +19,11 @@ device = sys.argv[1]
 def printHelp():
     print("+++ The BUSSide accepts the following commands")
     print("+++")
-    print("+++ > spi send <cmd1> ....")
-    print("+++ > spi flash readID")
+    print("+++ > spi discover pinout")
+    print("+++ > spi send default <cmdbyte1> ....")
+    print("+++ > spi send <cs> <clk> <mosi> <miso> <cmdbyte1> ....")
+    print("+++ > spi fuzz <cs> <clk> <mosi> <miso>")
+    print("+++ > spi flash readID [<cs> <clk> <mosi> <miso>]")
     print("+++ > spi flash dump <size> <outfile>")
     print("+++ > spi flash write <size> <infile>")
     print("+++ > i2c discover pinout")

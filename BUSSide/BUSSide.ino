@@ -168,12 +168,32 @@ loop()
       reply.bs_command = BS_REPLY_ECHO;
       rv = 0;
       break;
+
+    case BS_SPI_ERASE_SECTOR:
+      rv = erase_sector_SPI_flash(&request, &reply);
+      break;
+    
+    case BS_SPI_DISCOVER_PINOUT:
+      rv = spi_discover(&request, &reply);
+      break;
+      
+    case BS_SPI_BB_READID:
+      rv = spi_read_id_bb(&request, &reply);
+      break;
+      
+    case BS_SPI_BB_SPI_FLASH_DUMP:
+      rv = read_SPI_flash_bitbang(&request, &reply);
+      break;
+
+    case BS_SPI_COMMAND_FINDER:
+      rv = spi_command_finder(&request, &reply);
+      break;
       
     default:
       rv = -1;
       break;
     }
 
-    send_reply(rv, &request, &reply);    
     reset_gpios();
+    send_reply(rv, &request, &reply);    
 }

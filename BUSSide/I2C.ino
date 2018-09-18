@@ -51,7 +51,6 @@ read_I2C_eeprom(struct bs_request_s *request, struct bs_reply_s *reply)
         reply_data[i++] = data;
         count++;
       }
-      ESP.wdtFeed();
     }
   }
   reply->bs_reply_length = request->bs_request_args[0];
@@ -142,17 +141,6 @@ I2C_active_scan1(struct bs_request_s *request, struct bs_reply_s *reply, int sda
 #define BYTESTOREAD 8
       n = Wire.requestFrom(slaveAddress, BYTESTOREAD);
       if (n != BYTESTOREAD)
-        continue;
-      gotitalready = 0;
-      for (int i = 0; i < 100; i++) {
-        if (Wire.available() < BYTESTOREAD) {
-          delay(5);
-        } else {
-          gotitalready = 1;
-          break;
-        }
-      }
-      if (!gotitalready)
         continue;
       ESP.wdtFeed();
       numberOfSlaves++;
