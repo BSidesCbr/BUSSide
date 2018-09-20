@@ -8,6 +8,9 @@ unsigned long crc_update(unsigned long crc, byte data);
 unsigned long crc_mem(char *s, int n);
 void delay_us(int us);
 
+int disable_write_protection(struct bs_request_s *request, struct bs_reply_s *reply);
+int enable_write_protection(struct bs_request_s *request, struct bs_reply_s *reply);
+int write_SPI_flash(struct bs_request_s *request, struct bs_reply_s *reply);
 int spi_command_finder(struct bs_request_s *request, struct bs_reply_s *reply);
 int send_SPI_command(struct bs_request_s *request, struct bs_reply_s *reply);
 int data_discovery(struct bs_request_s *request, struct bs_reply_s *reply);
@@ -78,6 +81,12 @@ asm_ccount(void)
 #define BS_REPY_SPI_BB_SPI_FLASH_DUMP   34
 #define BS_SPI_COMMAND_FINDER           35
 #define BS_REPLY_SPI_COMMAND_FINDER     36
+#define BS_SPI_FLASH                    37
+#define BS_REPLY_SPI_FLASH              38
+#define BS_SPI_DISABLE_WP               39
+#define BS_REPLY_SPI_DISABLE_WP         40
+#define BS_SPI_ENABLE_WP                41
+#define BS_REPLY_SPI_ENABLE_WP          42
 
 #define BS_REQUEST_SIZE (4 + 4 + 4 + 4*256 + 4)
 #define BS_REPLY_SIZE (BS_REQUEST_SIZE)

@@ -3,6 +3,9 @@
 
 #define CS_GPIO             D8
 
+int write_enable(uint32_t spispeed);
+int write_disable(uint32_t spispeed);
+
 static uint8_t
 spi_transfer_byte(int spispeed, int gpio_CS, int gpio_CLK, int gpio_MOSI, int gpio_MISO, uint8_t data)
 {
@@ -283,28 +286,153 @@ erase_sector_SPI_flash(struct bs_request_s *request, struct bs_reply_s *reply)
 {
   uint32_t skipsize, spispeed;
   uint8_t *data;
-  
-  skipsize = request->bs_request_args[1];
-  spispeed = request->bs_request_args[2];
 
+  spispeed = request->bs_request_args[0];
+  skipsize = request->bs_request_args[1];
+  
+  write_enable(spispeed);
+  
   pinMode(CS_GPIO, OUTPUT);
   digitalWrite(CS_GPIO, HIGH);
   SPI.begin();
   SPI.beginTransaction(SPISettings(spispeed, MSBFIRST, SPI_MODE0));
   digitalWrite(CS_GPIO, LOW);
-  (void)SPI.transfer(0x06); // WREN enable write status register
   (void)SPI.transfer(0x20); // sector erase
   (void)SPI.transfer((skipsize & 0xff0000) >> 16);
   (void)SPI.transfer((skipsize & 0x00ff00) >>  8);
   (void)SPI.transfer((skipsize & 0x0000ff));
   delay(25); // Tse is 25 milliseconds
-  (void)SPI.transfer(0x04); // WRDI disable write status register
+  digitalWrite(CS_GPIO, HIGH);
+  SPI.endTransaction();
+  SPI.end();
+
+  write_disable(spispeed);
+  return 0;
+}
+
+int
+write_disable(uint32_t spispeed)
+{
+  pinMode(CS_GPIO, OUTPUT);
+  digitalWrite(CS_GPIO, HIGH);
+  SPI.begin();
+  SPI.beginTransaction(SPISettings(spispeed, MSBFIRST, SPI_MODE0));
+  digitalWrite(CS_GPIO, LOW);
+  (void)SPI.transfer(0x04); // disable write status register  
   digitalWrite(CS_GPIO, HIGH);
   SPI.endTransaction();
   SPI.end();
   return 0;
 }
 
+int
+write_enable(uint32_t spispeed)
+{
+  pinMode(CS_GPIO, OUTPUT);
+  digitalWrite(CS_GPIO, HIGH);
+  SPI.begin();
+  SPI.beginTransaction(SPISettings(spispeed, MSBFIRST, SPI_MODE0));
+  digitalWrite(CS_GPIO, LOW);
+  (void)SPI.transfer(0x06); // WREN enable write status register  
+  digitalWrite(CS_GPIO, HIGH);
+  SPI.endTransaction();
+  SPI.end();
+  return 0;
+
+}
+
+int
+disable_write_protection(struct bs_request_s *request, struct bs_reply_s *reply)
+{
+  uint8_t s1, s2;
+  uint32_t spispeed;
+
+  spispeed = request->bs_request_args[0];
+  
+  pinMode(CS_GPIO, OUTPUT);
+  
+  digitalWrite(CS_GPIO, HIGH);
+  SPI.begin();
+  SPI.beginTransaction(SPISettings(spispeed, MSBFIRST, SPI_MODE0));
+  digitalWrite(CS_GPIO, LOW);
+  (void)SPI.transfer(0x05); // read status register 1
+  s1 = SPI.transfer(0x00);
+  digitalWrite(CS_GPIO, HIGH);
+  SPI.endTransaction();
+
+  SPI.beginTransaction(SPISettings(spispeed, MSBFIRST, SPI_MODE0));
+  digitalWrite(CS_GPIO, LOW);
+  (void)SPI.transfer(0x35); // read status register 2
+  s2 = SPI.transfer(0x00);
+  digitalWrite(CS_GPIO, HIGH);
+  SPI.endTransaction();
+  SPI.end();
+
+  s1 &= ~(1 << 2); // clear BP0
+  s1 &= ~(1 << 3); // clear BP1
+  s1 &= ~(1 << 4); // clear BP2
+  
+  write_enable(spispeed);
+  SPI.begin();
+  SPI.beginTransaction(SPISettings(spispeed, MSBFIRST, SPI_MODE0));
+  digitalWrite(CS_GPIO, LOW);  
+  (void)SPI.transfer(0x01); // write status register
+  (void)SPI.transfer(s1);
+  (void)SPI.transfer(s2);
+  digitalWrite(CS_GPIO, HIGH);
+  SPI.endTransaction();
+  SPI.end();
+  delay(15);
+  write_disable(spispeed);
+  return 0;
+}
+
+
+int
+enable_write_protection(struct bs_request_s *request, struct bs_reply_s *reply)
+{
+  uint8_t s1, s2;
+  uint32_t spispeed;
+
+  spispeed = request->bs_request_args[0];
+  
+  pinMode(CS_GPIO, OUTPUT);
+  
+  digitalWrite(CS_GPIO, HIGH);
+  SPI.begin();
+  SPI.beginTransaction(SPISettings(spispeed, MSBFIRST, SPI_MODE0));
+  digitalWrite(CS_GPIO, LOW);
+  (void)SPI.transfer(0x05); // read status register 1
+  s1 = SPI.transfer(0x00);
+  digitalWrite(CS_GPIO, HIGH);
+  SPI.endTransaction();
+
+  SPI.beginTransaction(SPISettings(spispeed, MSBFIRST, SPI_MODE0));
+  digitalWrite(CS_GPIO, LOW);
+  (void)SPI.transfer(0x35); // read status register 2
+  s2 = SPI.transfer(0x00);
+  digitalWrite(CS_GPIO, HIGH);
+  SPI.endTransaction();
+  SPI.end();
+
+  s1 |= (1 << 2); // set BP0
+  s1 |= (1 << 3); // set BP1
+  s1 |= (1 << 4); // set BP2
+  
+  write_enable(spispeed);
+  SPI.begin();
+  SPI.beginTransaction(SPISettings(spispeed, MSBFIRST, SPI_MODE0));
+  digitalWrite(CS_GPIO, LOW);  
+  (void)SPI.transfer(0x01); // write status register
+  (void)SPI.transfer(s1);
+  (void)SPI.transfer(s2);
+  digitalWrite(CS_GPIO, HIGH);
+  SPI.endTransaction();
+  SPI.end();
+  delay(15);
+  write_disable(spispeed);
+  return 0;
+}
 int
 write_SPI_flash(struct bs_request_s *request, struct bs_reply_s *reply)
 {
@@ -314,31 +442,29 @@ write_SPI_flash(struct bs_request_s *request, struct bs_reply_s *reply)
   writesize = request->bs_request_args[0];
   skipsize = request->bs_request_args[1];
   spispeed = request->bs_request_args[2];
-  if (writesize > sizeof(reply->bs_reply_data))
+  if (writesize != 256)
     return -1;
-  data = (uint8_t *)&reply->bs_reply_data[0];
-    
+  data = (uint8_t *)&request->bs_request_args[3];
+
+  write_enable(spispeed);
   pinMode(CS_GPIO, OUTPUT);
   digitalWrite(CS_GPIO, HIGH);
   SPI.begin();
   SPI.beginTransaction(SPISettings(spispeed, MSBFIRST, SPI_MODE0));
   digitalWrite(CS_GPIO, LOW);
-  (void)SPI.transfer(0x06); // WREN enable write status register
-  digitalWrite(CS_GPIO, HIGH);
-  delay(25);
-  digitalWrite(CS_GPIO, LOW);
-  for (int i = 0 ; i < writesize; i++) {
-    (void)SPI.transfer(0x02); // write program byte
-    (void)SPI.transfer((skipsize & 0xff0000) >> 16);
-    (void)SPI.transfer((skipsize & 0x00ff00) >>  8);
-    (void)SPI.transfer((skipsize & 0x0000ff));
-    SPI.transfer(data[i++]);
+  (void)SPI.transfer(0x02); // write program page
+  (void)SPI.transfer((skipsize & 0xff0000) >> 16);
+  (void)SPI.transfer((skipsize & 0x00ff00) >>  8);
+  (void)SPI.transfer((skipsize & 0x0000ff));
+  for (int i = 0 ; i < 256; i++, writesize--) {
+    SPI.transfer(data[i]);
     ESP.wdtFeed();
   }
-  (void)SPI.transfer(0x04); // WRDI disable write status register
   digitalWrite(CS_GPIO, HIGH);
+  delay(3);
   SPI.endTransaction();
   SPI.end();
+  write_disable(spispeed);
   reply->bs_reply_length = writesize;
   return 0;
 }

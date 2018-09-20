@@ -188,6 +188,18 @@ loop()
     case BS_SPI_COMMAND_FINDER:
       rv = spi_command_finder(&request, &reply);
       break;
+
+    case BS_SPI_FLASH:
+      rv = write_SPI_flash(&request, &reply);
+      break;
+
+    case BS_SPI_DISABLE_WP:
+      rv = disable_write_protection(&request, &reply);
+      break;
+
+    case BS_SPI_ENABLE_WP:
+      rv  = enable_write_protection(&request, &reply);
+      break;
       
     default:
       rv = -1;
