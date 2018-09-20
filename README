@@ -3,5 +3,16 @@ License: GPLv3
 
 http://busside.com.au
 
+To flash the firmware:
+
+# apt-get install esptool
+# git clone http://github.com/BSidesCbr/BUSSide.git
+# esptool --port /dev/ttyUSB0 write_flash 0x00000 BUSSide/FirmwareImages/*.bin
+
+# cd BUSSide/Client
+# ./busside.py /dev/ttyUSB0
+
+To build from source:
+
 Please install https://github.com/plerup/espsoftwareserial in your Arduino
 libraries.
