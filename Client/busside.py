@@ -1,12 +1,13 @@
 #!/usr/bin/python
 
+import struct
 import os
 import sys
-import bs_spi
 import bs_i2c
 import bs_uart
 import bs_jtag
 import bs
+import bs_spi
 
 sequence_number = 5
 
@@ -36,6 +37,7 @@ def printHelp():
     print("+++ > i2c flash dump <sdaPin> <sclPin> <slaveAddress> <addressLength> <size> <outfile>")
     print("+++ > i2c flash write <sdaPin> <sclPin> <slaveAddress> <addressLength> <size> <infile>")
     print("+++ > jtag discover pinout")
+    print("+++ > uart discover data")
     print("+++ > uart passthrough auto")
     print("+++ > uart discover rx")
     print("+++ > uart discover tx <rx_gpio> <baudrate>")
@@ -44,21 +46,35 @@ def printHelp():
     print("+++ > quit")
     print("+++")
 
-def doCommand(device, command):
+def doCommand(command):
     if command.find("spi ") == 0:
-        return bs_spi.doCommand(device, command[4:])
+        return bs_spi.doCommand(command[4:])
     elif command.find("i2c ") == 0:
-        return bs_i2c.doCommand(device, command[4:])
+        return bs_i2c.doCommand(command[4:])
     elif command.find("uart ") == 0:
-        return bs_uart.doCommand(device, command[5:])
+        return bs_uart.doCommand(command[5:])
     elif command.find("jtag ") == 0:
-        return bs_jtag.doCommand(device, command[5:])
+        return bs_jtag.doCommand(command[5:])
     elif command == "quit":
         return -1
     else:
         return None
 
-bs.sync(device)
+try:
+    with open("/tmp/BUSSide.seq", "rb") as f:
+        d = f.read(4)
+        if len(d) == 4:
+            seq, = struct.unpack('<I', d)
+            bs.set_sequence_number(seq)
+except:
+    pass
+
+rv = bs.Connect(device)
+if rv is None:
+    print("--- Couldn't connect.")
+    print("--- Unplug the BUSSide USB cable. Wait a few seconds.")
+    print("--- Plug it in again. Then restart the software.")
+    sys.exit(1)
 
 print("+++")
 print("+++ Welcome to the BUSSide")
@@ -68,8 +84,11 @@ printHelp()
 print("+++")
 
 while True:
-    command = raw_input("> ")
-    rv = doCommand(device, command)
+    try:
+        command = raw_input("> ")
+    except:
+        break
+    rv = doCommand(command)
     if rv is None:
         printHelp()
     elif rv == -1:

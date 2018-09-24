@@ -76,136 +76,190 @@ setup()
 static uint32_t sequence_number = 1;
 
 void
-send_reply(int rv, struct bs_request_s *request, struct bs_reply_s *reply)
+send_reply(struct bs_request_s *request, struct bs_reply_s *reply)
 {
     reply->bs_sequence_number = request->bs_sequence_number;
-    if (rv == 0) {
-      reply->bs_checksum = crc_mem((char *)reply, BS_REPLY_SIZE - 4);
-      Serial.write((char *)reply, BS_REPLY_SIZE);
+    reply->bs_checksum = 0;
+    reply->bs_checksum = crc_mem((char *)reply, BS_HEADER_SIZE + reply->bs_payload_length);
+    Serial.write((uint8_t *)reply, BS_HEADER_SIZE + reply->bs_payload_length);
+    Serial.flush();
+}
+
+static void
+FlushIncoming()
+{
+  while (Serial.available() > 0) {
+    (void)Serial.read();
+  }
+}
+
+static void
+Sync()
+{
+  while (1) {
+    int rv;
+    int ch;
+    
+    rv = Serial.readBytes((uint8_t *)&ch, 1);
+    if (rv <= 0)
+      continue;
+    if (ch == 0xfe) {
+got1:
+      rv = Serial.readBytes((uint8_t *)&ch, 1);
+      if (rv <= 0)
+        continue;
+      if (ch == 0xca)
+        return;
+      else if (ch == 0xfe)
+        goto got1;
     }
+  }
 }
 
 void
 loop()
 {
-    struct bs_request_s request;
-    struct bs_reply_s reply;
+    struct bs_frame_s header;
+    struct bs_frame_s *request, *reply;
     int rv;
 
-    rv = Serial.readBytes((char *)&request, BS_REQUEST_SIZE);
-    if (rv == -1)
-        return;
-    while (Serial.available() > 0)
-      (void)Serial.read();
-
-    if (crc_mem((char *)&request, BS_REQUEST_SIZE - 4) != request.bs_checksum) {
+    Serial.setTimeout(1000);
+    Sync();
+    rv = Serial.readBytes((char *)&header, BS_HEADER_SIZE);
+    if (rv <= 0) {
+      FlushIncoming();
       return;
     }
-    if (request.bs_sequence_number <= sequence_number)
+    if (header.bs_payload_length > 65356) {
+      FlushIncoming();
       return;
-    sequence_number = request.bs_sequence_number;
+    }
+    request = (struct bs_frame_s *)alloca(BS_HEADER_SIZE + header.bs_payload_length);
+    memcpy(request, &header, BS_HEADER_SIZE);
+    if (request->bs_payload_length > 0) {
+      Serial.setTimeout(1000);
+      rv = Serial.readBytes((char *)&request->bs_payload, request->bs_payload_length);
+      if (rv <= 0) {
+        FlushIncoming();
+        return;
+      }
+    }
+    
+    request->bs_checksum = 0;
+    if (crc_mem((char *)request, BS_HEADER_SIZE + request->bs_payload_length) != header.bs_checksum) {
+      return;
+    }
+    if (request->bs_sequence_number <= sequence_number)
+      return;
+    sequence_number = request->bs_sequence_number;
 
-    memset(&reply, 0, sizeof(reply));
-    reply.bs_command = request.bs_command;
+    reply = NULL;
    
-    switch (request.bs_command) {
+    switch (request->bs_command) {
     case BS_SPI_SEND:
-      rv = send_SPI_command(&request, &reply);
+      reply = send_SPI_command(request);
       break;
       
     case BS_DATA_DISCOVERY:
-      rv = data_discovery(&request, &reply);
+      reply = data_discovery(request);
       break;
 
     case BS_UART_DISCOVER_RX:
-      rv = data_discovery(&request, &reply);
-      if (rv != 0)
-        break;
-      rv = UART_all_line_settings(&request, &reply);
+      reply = data_discovery(request);
+      if (reply != NULL) {
+        free(reply);
+        reply = UART_all_line_settings(request);
+      }
       break;
 
     case BS_UART_DISCOVER_TX:
-      rv = UART_discover_tx(&request, &reply);
+      reply = UART_discover_tx(request);
       break;
       
     case BS_UART_PASSTHROUGH:
-      rv = 0;
-      send_reply(0, &request, &reply);
-      (void)UART_passthrough(&request, &reply);
-      // no return
+      reply = (struct bs_frame_s *)malloc(BS_HEADER_SIZE);
+      if (reply != NULL) {
+        send_reply(request, reply);
+        free(reply);
+        (void)UART_passthrough(request);
+        // no return
+      }
       break;
       
     case BS_I2C_DISCOVER_SLAVES:
-      rv = discover_I2C_slaves(&request, &reply);
+      reply = discover_I2C_slaves(request);
       break;
 
     case BS_I2C_FLASH_DUMP:
-      rv = read_I2C_eeprom(&request, &reply);
+      reply = read_I2C_eeprom(request);
       break;
 
     case BS_I2C_FLASH:
-      rv = write_I2C_eeprom(&request, &reply);
+      reply = write_I2C_eeprom(request);
       break;
       
     case BS_I2C_DISCOVER:
-      rv = I2C_active_scan(&request, &reply);
+      reply = I2C_active_scan(request);
       break;
       
     case BS_SPI_FLASH_DUMP:
-      rv = read_SPI_flash(&request, &reply);
+      reply = read_SPI_flash(request);
       break;  
 
     case BS_SPI_READID:
-      rv = SPI_read_id(&request, &reply);
+      reply = SPI_read_id(request);
       break;
       
     case BS_JTAG_DISCOVER_PINOUT:
-      rv = JTAG_scan(&request, &reply);
+      reply = JTAG_scan(request);
       break;
 
     case BS_ECHO:
-      memcpy(&reply, &request, BS_REPLY_SIZE - 4);
-      reply.bs_command = BS_REPLY_ECHO;
-      rv = 0;
+      reply = (struct bs_frame_s *)malloc(BS_HEADER_SIZE + request->bs_payload_length);
+      if (reply != NULL) {
+        memcpy(reply, request, BS_HEADER_SIZE + request->bs_payload_length);
+        reply->bs_command = BS_REPLY_ECHO;
+      }
       break;
 
     case BS_SPI_ERASE_SECTOR:
-      rv = erase_sector_SPI_flash(&request, &reply);
+      reply = erase_sector_SPI_flash(request);
       break;
     
     case BS_SPI_DISCOVER_PINOUT:
-      rv = spi_discover(&request, &reply);
+      reply = spi_discover(request);
       break;
       
     case BS_SPI_BB_READID:
-      rv = spi_read_id_bb(&request, &reply);
+      reply = spi_read_id_bb(request);
       break;
       
     case BS_SPI_BB_SPI_FLASH_DUMP:
-      rv = read_SPI_flash_bitbang(&request, &reply);
+      reply = read_SPI_flash_bitbang(request);
       break;
 
     case BS_SPI_COMMAND_FINDER:
-      rv = spi_command_finder(&request, &reply);
+      reply = spi_command_finder(request);
       break;
 
     case BS_SPI_FLASH:
-      rv = write_SPI_flash(&request, &reply);
+      reply = write_SPI_flash(request);
       break;
 
     case BS_SPI_DISABLE_WP:
-      rv = disable_write_protection(&request, &reply);
+      reply = disable_write_protection(request);
       break;
 
     case BS_SPI_ENABLE_WP:
-      rv  = enable_write_protection(&request, &reply);
+      reply  = enable_write_protection(request);
       break;
       
     default:
-      rv = -1;
+      reply = NULL;
       break;
     }
 
     reset_gpios();
-    send_reply(rv, &request, &reply);    
+    send_reply(request, reply);
+    free(reply);    
 }

@@ -244,7 +244,7 @@ static float bitTime;
 #define NWIDTHS 200
 
 static int
-UART_line_settings_direct(struct bs_request_s *request, struct bs_reply_s *reply, int index)
+UART_line_settings_direct(struct bs_reply_s *reply, int index)
 {
   int widths[NWIDTHS];
   char s[100];
@@ -252,6 +252,7 @@ UART_line_settings_direct(struct bs_request_s *request, struct bs_reply_s *reply
   int n;
   int ret;
   int pin;
+  uint32_t *reply_data;
 
   pin = gpioIndex[index];
   if (pin == D0)
@@ -261,12 +262,10 @@ UART_line_settings_direct(struct bs_request_s *request, struct bs_reply_s *reply
 
   ret = buildwidths(pin, widths, NWIDTHS);
   if (ret) {
-//    Serial.printf("--- Couldn't sample %i\n", ret);
     return -6;
   }
   uartSpeedIndex = calcBaud(pin, widths, NWIDTHS);
   if (uartSpeedIndex < 0) {
-//    Serial.println("Timeout. Not a UART.\n");
     return -1;
   }
   bitTime = uartInfo[uartSpeedIndex].microsDelay;
@@ -279,68 +278,60 @@ UART_line_settings_direct(struct bs_request_s *request, struct bs_reply_s *reply
     }
   }
   if (frameSize < 0) {
-//    Serial.println("UART framing not detected.\nNot a UART.");
     return -1;
   } else {
-//    sprintf(s, "FRAMESIZE %i", frameSize);
   }
-//  Serial.println(s);
   if (tryFrameSize(frameSize, 2, widths, NWIDTHS)){
     stopBits = 2;
   } else {
     stopBits = 1;
   }
-//  sprintf(s, "STOPBITS: %i", stopBits);
-//  Serial.println(s);
 
   parity = calcParity(frameSize, stopBits, widths, NWIDTHS);
   if (parity == -2) {
-//    Serial.println("Parity Timeout. Not a UART.\n");
     return -1;
   } else if (parity < 0) {
     dataBits = frameSize - stopBits - 1;
-//    sprintf(s, "PARITY: NONE");
   } else {
     dataBits = frameSize - stopBits - 1 - 1;
     if (parity == 0) {
-//      sprintf(s, "PARITY: EVEN");
     } else {
-//      sprintf(s, "PARITY: ODD");
     }
   }
-//  Serial.println(s);
-  
-//  sprintf(s, "DATABITS: %i", dataBits);
-//  Serial.println(s);
-  
-  reply->bs_reply_data[N_GPIO + index*4 + 0] = dataBits;
-  reply->bs_reply_data[N_GPIO + index*4 + 1] = stopBits;
-  reply->bs_reply_data[N_GPIO + index*4 + 2] = parity;
-  reply->bs_reply_data[N_GPIO + index*4 + 3] = uartInfo[uartSpeedIndex].baudRate;
-  
+
+  reply_data = (uint32_t *)&reply->bs_payload[0];
+  reply_data[index*5 + 0] = gpio[index];
+  reply_data[index*5 + 1] = dataBits;
+  reply_data[index*5 + 2] = stopBits;
+  reply_data[index*5 + 3] = parity;
+  reply_data[index*5 + 4] = uartInfo[uartSpeedIndex].baudRate;
+
   return 0;
 }
 
-static int
-UART_all_line_settings_direct(struct bs_request_s *request, struct bs_reply_s *reply)
+struct bs_frame_s*
+UART_all_line_settings(struct bs_request_s *request)
 {
+  struct bs_frame_s *reply;
   int u = 0;
 
+  reply = (struct bs_frame_s *)malloc(BS_HEADER_SIZE + 4*5*N_GPIO);
+  if (reply == NULL)
+    return NULL;
+  reply->bs_payload_length = 4*5*N_GPIO;
+  memset(reply->bs_payload, 0, 4*5*N_GPIO);
   for (int i = 0; i < N_GPIO; i++) {
     if (gpio[i] > 100) {
-     u++;
-//      Serial.printf("--- Trying UART on GPIO %d\n", i);
-//      Serial.flush();
+      u++;
       for (int attempt = 0; attempt < 50; attempt++) {
         int ret;
-        
-         ret = UART_line_settings_direct(request, reply, i);
-         if (ret == 0) {
-//          Serial.printf("--- Detected UART line settings.\n");
+
+        ESP.wdtFeed();
+        ret = UART_line_settings_direct(reply, i);
+        if (ret == 0) {
           u++;
           break;
         } else {
-//          Serial.printf("--- Didn't detect UART. Retrying to be sure.\n");
           if (ret == -6) { // Timeout
             break;
           }
@@ -348,20 +339,20 @@ UART_all_line_settings_direct(struct bs_request_s *request, struct bs_reply_s *r
       }
     }
   }
-  return 0;
+  return reply;
 }
 
-int
-UART_all_line_settings(struct bs_request_s *request, struct bs_reply_s *reply)
+struct bs_frame_s*
+data_discovery(struct bs_request_s *request)
 {
-  return UART_all_line_settings_direct(request, reply);
-}
-
-int
-data_discovery(struct bs_request_s *request, struct bs_reply_s *reply)
-{
+  struct bs_frame_s *reply;
+  uint32_t *reply_data;
   int32_t startTime;
 
+  reply = (struct bs_frame_s *)malloc(BS_HEADER_SIZE + N_GPIO*4);
+  if (reply == NULL)
+    return NULL;
+  reply_data = (uint32_t *)&reply->bs_payload[0];
   startTime = asm_ccount();
   for (int i = 0; i < N_GPIO; i++) {
     if (gpioIndex[i] == D0)
@@ -383,22 +374,24 @@ data_discovery(struct bs_request_s *request, struct bs_reply_s *reply)
       }
     }
   } while ((uint32_t)(asm_ccount() - startTime)/FREQ < (7.5 * 1000000));  
-  reply->bs_reply_length = N_GPIO;
+  reply->bs_payload_length = 4*N_GPIO;
   for (int i = 0; i < N_GPIO; i++) {
-    reply->bs_reply_data[i] = gpio[i];
+    reply_data[i] = gpio[i];
   }
-  return 0;
+  return reply;
 }
 
-int
-UART_passthrough(struct bs_request_s *request, struct bs_reply_s *reply)
+struct bs_frame_s*
+UART_passthrough(struct bs_request_s *request)
 {
+  uint32_t *request_args;
   int rxpin, txpin;
   int baudrate;
 
-  rxpin = request->bs_request_args[0];
-  txpin = request->bs_request_args[1];
-  baudrate = request->bs_request_args[2];
+  request_args = (uint32_t *)&request->bs_payload[0];
+  rxpin = request_args[0];
+  txpin = request_args[1];
+  baudrate = request_args[2];
   SoftwareSerial ser(gpioIndex[rxpin], gpioIndex[txpin]);
   ser.begin(baudrate);
   while (1) {
@@ -414,7 +407,7 @@ UART_passthrough(struct bs_request_s *request, struct bs_reply_s *reply)
       yield();
     }
   }
-  return 0;
+  return NULL;
 }
 
 int
@@ -437,14 +430,22 @@ UART_testtx(SoftwareSerial *ser, int testChar)
   return 0;
 }
 
-int
-UART_discover_tx(struct bs_request_s *request, struct bs_reply_s *reply)
+struct bs_frame_s*
+UART_discover_tx(struct bs_request_s *request)
 {
+  uint32_t *request_args, *reply_data;
+  struct bs_frame_s *reply;
   int rxpin, txpin;
   int baudrate;
- 
-  rxpin = request->bs_request_args[0] - 1;
-  baudrate = request->bs_request_args[1];
+
+  reply = (struct bs_frame_s *)malloc(BS_HEADER_SIZE + 4);
+  if (reply == NULL)
+    return NULL;
+  reply->bs_payload_length = 4;
+  reply_data = (uint32_t *)&reply->bs_payload[0];
+  request_args = (uint32_t *)&request->bs_payload[0];
+  rxpin = request_args[0] - 1;
+  baudrate = request_args[1];
   for (txpin = 1; txpin < N_GPIO; txpin++) {
     int found;
     
@@ -467,10 +468,10 @@ UART_discover_tx(struct bs_request_s *request, struct bs_reply_s *reply)
       }
     }
     if (found) {
-      reply->bs_reply_data[0] = txpin;
-      return 0;
+      reply_data[0] = txpin;
+      return reply;
     }
   }
-  reply->bs_reply_data[0] = -1;
-  return 0;
+  reply_data[0] = -1;
+  return reply;
 }

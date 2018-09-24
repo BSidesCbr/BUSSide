@@ -758,24 +758,32 @@ set_pattern()
 }
 #endif
 
-int
-JTAG_scan(struct bs_request_s *request, struct bs_reply_s *reply)
+struct bs_frame_s*
+JTAG_scan(struct bs_request_s *request)
 {
+  struct bs_frame_s *reply;
   int tck, tms, tdo, tdi, ntrst;
   int rv;
+  uint32_t *reply_data;
+  
+  reply = (struct bs_frame_s *)malloc(BS_HEADER_SIZE + 5*4);
+  if (reply == NULL)
+    return NULL;
+  reply->bs_payload_length = 6*4;
+  reply_data = (uint32_t *)&reply->bs_payload[0];
   
   loopback_check();
   reply->bs_command = BS_REPLY_JTAG_DISCOVER_PINOUT;
   rv = scan(&tck, &tms, &tdi, &tdo, &ntrst);
-  reply->bs_reply_data[0] = rv;
+  reply_data[0] = rv;
   if (rv > 0) {
-   reply->bs_reply_data[1] = tck + 1;
-   reply->bs_reply_data[2] = tms + 1;
-   reply->bs_reply_data[3] = tdi + 1;
-   reply->bs_reply_data[4] = tdo + 1;
-   reply->bs_reply_data[5] = ntrst + 1;
+   reply_data[1] = tck + 1;
+   reply_data[2] = tms + 1;
+   reply_data[3] = tdi + 1;
+   reply_data[4] = tdo + 1;
+   reply_data[5] = ntrst + 1;
   }
-  return 0;
+  return reply;
 }
 
 void

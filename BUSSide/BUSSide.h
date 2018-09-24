@@ -4,30 +4,44 @@
 #define FREQ 160
 #define N_GPIO 9
 
+struct bs_frame_s {
+  uint32_t bs_command;
+  uint32_t bs_payload_length;
+  uint32_t bs_sequence_number;
+  uint32_t bs_checksum;
+  uint32_t bs_payload[0];
+};
+
+
+#define BS_HEADER_SIZE (4*4)
+
+#define bs_request_s bs_frame_s
+#define bs_reply_s bs_frame_s
+
 unsigned long crc_update(unsigned long crc, byte data);
 unsigned long crc_mem(char *s, int n);
 void delay_us(int us);
 
-int disable_write_protection(struct bs_request_s *request, struct bs_reply_s *reply);
-int enable_write_protection(struct bs_request_s *request, struct bs_reply_s *reply);
-int write_SPI_flash(struct bs_request_s *request, struct bs_reply_s *reply);
-int spi_command_finder(struct bs_request_s *request, struct bs_reply_s *reply);
-int send_SPI_command(struct bs_request_s *request, struct bs_reply_s *reply);
-int data_discovery(struct bs_request_s *request, struct bs_reply_s *reply);
-int UART_all_line_settings(struct bs_request_s *request, struct bs_reply_s *reply);
-int UART_discover_tx(struct bs_request_s *request, struct bs_reply_s *reply);
-int discover_I2C_slaves(struct bs_request_s *request, struct bs_reply_s *reply);
-int I2C_active_scan(struct bs_request_s *request, struct bs_reply_s *reply);
-int read_I2C_eeprom(struct bs_request_s *request, struct bs_reply_s *reply);
-int write_I2C_eeprom(struct bs_request_s *request, struct bs_reply_s *reply);
-int read_SPI_flash(struct bs_request_s *request, struct bs_reply_s *reply);
-int JTAG_scan(struct bs_request_s *request, struct bs_reply_s *reply);
-int SPI_read_id(struct bs_request_s *request, struct bs_reply_s *reply);
-int UART_passthrough(struct bs_request_s *request, struct bs_reply_s *reply);
-int erase_sector_SPI_flash(struct bs_request_s *request, struct bs_reply_s *reply);
-int spi_discover(struct bs_request_s *request, struct bs_reply_s *reply);
-int spi_read_id_bb(struct bs_request_s *request, struct bs_reply_s *reply);
-int read_SPI_flash_bitbang(struct bs_request_s *request, struct bs_reply_s *reply);
+struct bs_frame_s *disable_write_protection(struct bs_request_s *request);
+struct bs_frame_s *enable_write_protection(struct bs_request_s *request);
+struct bs_frame_s *write_SPI_flash(struct bs_request_s *request);
+struct bs_frame_s *spi_command_finder(struct bs_request_s *request);
+struct bs_frame_s *send_SPI_command(struct bs_request_s *request);
+struct bs_frame_s *data_discovery(struct bs_request_s *request);
+struct bs_frame_s *UART_all_line_settings(struct bs_request_s *request);
+struct bs_frame_s *UART_discover_tx(struct bs_request_s *request);
+struct bs_frame_s *discover_I2C_slaves(struct bs_request_s *request);
+struct bs_frame_s *I2C_active_scan(struct bs_request_s *request);
+struct bs_frame_s *read_I2C_eeprom(struct bs_request_s *request);
+struct bs_frame_s *write_I2C_eeprom(struct bs_request_s *request);
+struct bs_frame_s *read_SPI_flash(struct bs_request_s *request);
+struct bs_frame_s *JTAG_scan(struct bs_request_s *request);
+struct bs_frame_s *SPI_read_id(struct bs_request_s *request);
+struct bs_frame_s *UART_passthrough(struct bs_request_s *request);
+struct bs_frame_s *erase_sector_SPI_flash(struct bs_request_s *request);
+struct bs_frame_s *spi_discover(struct bs_request_s *request);
+struct bs_frame_s *spi_read_id_bb(struct bs_request_s *request);
+struct bs_frame_s *read_SPI_flash_bitbang(struct bs_request_s *request);
 
 extern byte pins[];
 extern char *pinnames[];
@@ -87,24 +101,5 @@ asm_ccount(void)
 #define BS_REPLY_SPI_DISABLE_WP         40
 #define BS_SPI_ENABLE_WP                41
 #define BS_REPLY_SPI_ENABLE_WP          42
-
-#define BS_REQUEST_SIZE (4 + 4 + 4 + 4*256 + 4)
-#define BS_REPLY_SIZE (BS_REQUEST_SIZE)
-
-struct bs_request_s {
-  uint32_t bs_command;
-  uint32_t bs_command_length;
-  uint32_t bs_sequence_number;
-  uint32_t bs_request_args[256];
-  uint32_t bs_checksum;
-};
-
-struct bs_reply_s {
-  uint32_t bs_command;
-  uint32_t bs_reply_length;
-  uint32_t bs_sequence_number;
-  uint32_t bs_reply_data[256];
-  uint32_t bs_checksum;
-};
 
 #endif
