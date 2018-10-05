@@ -34,6 +34,56 @@ spi_transfer_byte(int spispeed, int gpio_CS, int gpio_CLK, int gpio_MOSI, int gp
 }
 
 static int
+spi_bb_send_fast_command(int spispeed, int cs, int clk, int mosi, int miso, uint8_t *out, uint32_t wrsize, uint8_t *in, int rdsize)
+{
+  pinMode(gpioIndex[cs], OUTPUT);
+  pinMode(gpioIndex[clk], OUTPUT);
+  pinMode(gpioIndex[mosi], OUTPUT);
+  pinMode(gpioIndex[miso], INPUT);
+  digitalWrite(gpioIndex[clk], LOW);
+  digitalWrite(gpioIndex[mosi], LOW);
+  digitalWrite(gpioIndex[cs], HIGH);
+  digitalWrite(gpioIndex[cs], LOW);
+
+  for (int i = 0; i < wrsize; i++) {
+    (void)spi_transfer_byte(spispeed, gpioIndex[cs], gpioIndex[clk], gpioIndex[mosi], gpioIndex[miso], out[i]);
+  }
+
+  for (int i = 0; i < rdsize; i++) {
+    in[i] = spi_transfer_byte(spispeed, gpioIndex[cs], gpioIndex[clk], gpioIndex[mosi], gpioIndex[miso], 0x00);
+  }
+  
+  digitalWrite(gpioIndex[cs], HIGH);
+  pinMode(gpioIndex[cs], INPUT);
+  pinMode(gpioIndex[clk], INPUT);
+  pinMode(gpioIndex[mosi], INPUT);
+  return 0;
+}
+
+static int
+spi_hw_bb_send_fast_command(int spispeed, int cs, int clk, int mosi, int miso, uint8_t *out, uint32_t wrsize, uint8_t *in, int rdsize)
+{
+  pinMode(CS_GPIO, OUTPUT);
+  digitalWrite(CS_GPIO, HIGH);
+  SPI.begin();
+  SPI.beginTransaction(SPISettings(spispeed, MSBFIRST, SPI_MODE0));
+  digitalWrite(CS_GPIO, LOW);
+  
+  for (int i = 0; i < wrsize; i++) {
+    (void)SPI.transfer(out[i]);
+  }
+
+  for (int i = 0; i < rdsize; i++) {
+    in[i] = SPI.transfer(0x00);
+  }
+
+  digitalWrite(CS_GPIO, HIGH);
+  SPI.endTransaction();
+  SPI.end();
+
+  return 0;
+}
+static int
 spi_bb_send_command(int spispeed, int cs, int clk, int mosi, int miso, uint8_t *in, uint8_t *out, int n)
 {
   pinMode(gpioIndex[cs], OUTPUT);
@@ -264,6 +314,39 @@ hw_send_SPI_command(struct bs_request_s *request)
   return reply;
 }
 
+struct bs_frame_s*
+send_SPI_fast_command(struct bs_request_s *request)
+{
+  struct bs_frame_s *reply;
+  uint32_t cmdsize;
+  uint8_t *cmd;
+  uint8_t *data;
+  uint32_t spispeed;
+  uint32_t wrsize, rdsize;
+  uint32_t cs, clk, mosi, miso;
+  uint32_t *request_args;
+
+  request_args = (uint32_t *)&request->bs_payload[0];
+
+  spispeed = request_args[0];
+  cs = request_args[1] - 1;
+  clk = request_args[2] - 1;
+  mosi = request_args[3] - 1;
+  miso = request_args[4] - 1;
+  wrsize = request_args[5];
+  rdsize = request_args[6];
+
+  reply = (struct bs_frame_s *)malloc(BS_HEADER_SIZE + rdsize);
+  if (reply == NULL)
+    return NULL;
+
+  data = (uint8_t *)&reply->bs_payload[0];
+  cmd = (uint8_t *)&request_args[7];
+  
+  spi_hw_bb_send_fast_command(spispeed, cs, clk, mosi, miso, cmd, wrsize, data, rdsize);
+  reply->bs_payload_length = rdsize;
+  return reply;
+}
 
 struct bs_frame_s*
 send_SPI_command(struct bs_request_s *request)

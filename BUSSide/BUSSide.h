@@ -27,6 +27,7 @@ struct bs_frame_s *enable_write_protection(struct bs_request_s *request);
 struct bs_frame_s *write_SPI_flash(struct bs_request_s *request);
 struct bs_frame_s *spi_command_finder(struct bs_request_s *request);
 struct bs_frame_s *send_SPI_command(struct bs_request_s *request);
+struct bs_frame_s *send_SPI_fast_command(struct bs_request_s *request);
 struct bs_frame_s *data_discovery(struct bs_request_s *request);
 struct bs_frame_s *UART_all_line_settings(struct bs_request_s *request);
 struct bs_frame_s *UART_discover_tx(struct bs_request_s *request);
@@ -101,5 +102,8 @@ asm_ccount(void)
 #define BS_REPLY_SPI_DISABLE_WP         40
 #define BS_SPI_ENABLE_WP                41
 #define BS_REPLY_SPI_ENABLE_WP          42
+#define BS_SPI_FAST_SEND                43
+#define BS_REPLY_SPI_FAST_SEND          44
+
 
 #endif

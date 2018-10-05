@@ -70,6 +70,15 @@ def FlushInput():
 
     myserial.flushInput()
 
+def Sync():
+    global myserial
+
+    ch1 = myserial.read(1)
+    ch2 = myserial.read(1)
+    if len(ch1) != 1 or len(ch2) != 1:
+        return False
+    return ord(ch1) == 0xfe and ord(ch2) == 0xca
+
 def requestreply(command, request_args, nretries=10):
     global myserial
     global mydevice
@@ -117,6 +126,9 @@ def requestreply(command, request_args, nretries=10):
 
         myserial.write(bs_sync + request)
         myserial.flush()
+
+        if not Sync():
+            continue
 
         # read reply header
         bs_command = myserial.read(4)

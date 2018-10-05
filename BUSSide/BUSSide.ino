@@ -74,10 +74,13 @@ setup()
 }
 
 static uint32_t sequence_number = 1;
+static uint8_t sync[] = "\xfe\xca";
 
 void
 send_reply(struct bs_request_s *request, struct bs_reply_s *reply)
 {
+    Serial.write(sync, 2);
+    Serial.flush();
     reply->bs_sequence_number = request->bs_sequence_number;
     reply->bs_checksum = 0;
     reply->bs_checksum = crc_mem((char *)reply, BS_HEADER_SIZE + reply->bs_payload_length);
@@ -158,6 +161,10 @@ loop()
     switch (request->bs_command) {
     case BS_SPI_SEND:
       reply = send_SPI_command(request);
+      break;
+
+    case BS_SPI_FAST_SEND:
+      reply = send_SPI_fast_command(request);
       break;
       
     case BS_DATA_DISCOVERY:
