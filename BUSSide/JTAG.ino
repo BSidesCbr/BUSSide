@@ -71,8 +71,7 @@ static long    DELAYUS                  = 5; //5000; // 5 MillisecondsHTAGboolea
 /*
  * Set the JTAG TAP state machine
  */
-static void
-tap_state(char tap_state[], int tck, int tms) 
+static void tap_state(char tap_state[], int tck, int tms) 
 {
 #ifdef DEBUGTAP
   Serial.print("tap_state: tms set to: ");
@@ -93,8 +92,7 @@ tap_state(char tap_state[], int tck, int tms)
 #endif
 }
 
-static int
-JTAG_clock(int tck, int tms, int tdi, int tdo, int tms_state, int tdi_state)
+static int JTAG_clock(int tck, int tms, int tdi, int tdo, int tms_state, int tdi_state)
 {
   int tdo_state;
 
@@ -108,8 +106,7 @@ JTAG_clock(int tck, int tms, int tdi, int tdo, int tms_state, int tdi_state)
   return tdo_state;
 }
 
-static uint32_t
-JTAG_read32(int tck, int tms, int tdi, int tdo)
+static uint32_t JTAG_read32(int tck, int tms, int tdi, int tdo)
 {
   uint32_t r;
 
@@ -121,8 +118,7 @@ JTAG_read32(int tck, int tms, int tdi, int tdo)
   return r;
 }
 
-static int
-JTAG_ndevices(int tck, int tms, int tdi, int tdo)
+static int JTAG_ndevices(int tck, int tms, int tdi, int tdo)
 {
   int nbDevices;
   int i;
@@ -172,8 +168,7 @@ JTAG_ndevices(int tck, int tms, int tdi, int tdo)
   return nbDevices;
 }
 
-static void
-JTAG_scan_chain(int tck, int tms, int tdi, int tdo, int ndevices)
+static void JTAG_scan_chain(int tck, int tms, int tdi, int tdo, int ndevices)
 {
   // go to reset state (that loads IDCODE into IR of all the devices)
   for(int i=0; i<5; i++) JTAG_clock(tck, tms, tdi, tdo, 1, 0);
@@ -191,16 +186,14 @@ JTAG_scan_chain(int tck, int tms, int tdi, int tdo, int ndevices)
   }
 }
 
-static void
-pulse_tms(int tck, int tms, int s_tms)
+static void pulse_tms(int tck, int tms, int s_tms)
 {
   if (tck == IGNOREPIN) return;
   digitalWrite(pins[tck], LOW);
   digitalWrite(pins[tms], s_tms); 
   digitalWrite(pins[tck], HIGH);
 }
-static void
-pulse_tdi(int tck, int tdi, int s_tdi)
+static void pulse_tdi(int tck, int tdi, int s_tdi)
 {
   if (DELAY) delayMicroseconds(50);
   if (tck != IGNOREPIN) digitalWrite(pins[tck], LOW);
@@ -260,8 +253,7 @@ init_pins(int tck = IGNOREPIN, int tms = IGNOREPIN, int tdi = IGNOREPIN, int ntr
  *
  * if retval == 1, *reglen returns the length of the register
  */
-static int
-check_data(char pattern[], int iterations, int tck, int tdi, int tdo, int *reg_len)
+static int check_data(char pattern[], int iterations, int tck, int tdi, int tdo, int *reg_len)
 {
   int i;
         int w          = 0;
@@ -310,8 +302,7 @@ check_data(char pattern[], int iterations, int tck, int tdi, int tdo, int *reg_l
   return nr_toggle > 1 ? nr_toggle : 0;
 }
 
-static void
-print_pins(int tck, int tms, int tdo, int tdi, int ntrst)
+static void print_pins(int tck, int tms, int tdo, int tdi, int ntrst)
 {
   if (VERBOSE) {
     if (ntrst != IGNOREPIN) {
@@ -335,8 +326,7 @@ print_pins(int tck, int tms, int tdo, int tdi, int ntrst)
  * Shift JTAG TAP to ShiftIR state. Send pattern to TDI and check
  * for output on TDO
  */
-static int
-scan(int *tck_pin, int *tms_pin, int *tdi_pin, int *tdo_pin, int *ntrst_pin)
+static int scan(int *tck_pin, int *tms_pin, int *tdi_pin, int *tdo_pin, int *ntrst_pin)
 {
   int tck, tms, tdo, tdi, ntrst;
   int checkdataret = 0;
@@ -410,8 +400,7 @@ scan(int *tck_pin, int *tms_pin, int *tdi_pin, int *tdo_pin, int *ntrst_pin)
  * the test again without the cable connected between controller
  * and target. Run with the verbose flag to examine closely.
  */
-static void
-loopback_check()
+static void loopback_check()
 {
   int tdo, tdi;
   int checkdataret = 0;
@@ -480,8 +469,7 @@ list_pin_names()
  * (oppposite to the old code).
  * If we get an IDCODE of all ones, we assume that the pins are wrong.
  */
-static void
-scan_idcode()
+static void scan_idcode()
 {
   int tck, tms, tdo, tdi, ntrst;
   int i, j;
@@ -563,8 +551,7 @@ scan_idcode()
   } /* for(trst=0; ...) */
 }
 
-static void
-shift_bypass()
+static void shift_bypass()
 {
   int tdi, tdo, tck;
   int checkdataret;
@@ -626,8 +613,7 @@ shift_bypass()
  * Shift in state[] as IR value.
  * Switch to ShiftDR state and end.
  */
-static void
-ir_state(char state[], int tck, int tms, int tdi) 
+static void ir_state(char state[], int tck, int tms, int tdi) 
 {
 #ifdef DEBUGIR
   Serial.println("ir_state: set TAP to ShiftIR:");
@@ -796,5 +782,3 @@ JTAG_reset(int ntrst)
   digitalWrite(pins[ntrst], HIGH);
   delay_us(50);
 }
-
-

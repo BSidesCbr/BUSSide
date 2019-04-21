@@ -1,3 +1,5 @@
+#include <SoftwareSerial.h>
+
 #include <Boards.h>
 #include <pins_arduino.h>
 #include "BUSSide.h"
@@ -88,16 +90,14 @@ send_reply(struct bs_request_s *request, struct bs_reply_s *reply)
     Serial.flush();
 }
 
-static void
-FlushIncoming()
+static void FlushIncoming()
 {
   while (Serial.available() > 0) {
     (void)Serial.read();
   }
 }
 
-static void
-Sync()
+static void Sync()
 {
   while (1) {
     int rv;
