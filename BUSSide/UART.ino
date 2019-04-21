@@ -29,8 +29,7 @@ struct uartInfo_s {
 
 static int uartSpeedIndex;
 
-static unsigned int
-findNumberOfUartSpeeds(void)
+static unsigned int findNumberOfUartSpeeds(void)
 {
   unsigned int i;
 
@@ -38,8 +37,7 @@ findNumberOfUartSpeeds(void)
   return i;
 }
 
-static int
-waitForIdle(int pin)
+static int waitForIdle(int pin)
 {
   unsigned long startTime;
   unsigned long bitTime10;
@@ -60,8 +58,7 @@ start:
   return 0;
 }
 
-static int
-buildwidths(int pin, int *widths, int nwidths)
+static int buildwidths(int pin, int *widths, int nwidths)
 {
   int val;
   int32_t startTime;
@@ -90,8 +87,7 @@ buildwidths(int pin, int *widths, int nwidths)
   return 0;
 }
 
-static unsigned int
-findminwidth(int *widths, int nwidths)
+static unsigned int findminwidth(int *widths, int nwidths)
 {
   int minIndex1;
   unsigned int min1;
@@ -107,8 +103,7 @@ findminwidth(int *widths, int nwidths)
 }
 
 
-static float
-autobaud(int pin, int *widths, int nwidths)
+static float autobaud(int pin, int *widths, int nwidths)
 {
   int sum;
   int c = 0;
@@ -123,8 +118,7 @@ autobaud(int pin, int *widths, int nwidths)
   return (float)sum/(float)c;
 }
 
-static int
-tryFrameSize(int framesize, int stopbits, int *widths, int nwidths)
+static int tryFrameSize(int framesize, int stopbits, int *widths, int nwidths)
 {
   float width_timepos = 0.0;
   float bitTime = uartInfo[uartSpeedIndex].microsDelay;
@@ -149,8 +143,7 @@ tryFrameSize(int framesize, int stopbits, int *widths, int nwidths)
   return 1;
 }
 
-static int
-calcBaud(int pin, int *widths, int nwidths)
+static int calcBaud(int pin, int *widths, int nwidths)
 {
   char fstr[6];
   char s[100];
@@ -179,8 +172,7 @@ calcBaud(int pin, int *widths, int nwidths)
   return baudIndex;
 }
 
-static int
-calcParity(int frameSize, int stopBits, int *widths, int nwidths)
+static int calcParity(int frameSize, int stopBits, int *widths, int nwidths)
 {
   float width_timepos = 0.0;
   float bitTime = uartInfo[uartSpeedIndex].microsDelay;
@@ -243,8 +235,7 @@ static float bitTime;
 
 #define NWIDTHS 200
 
-static int
-UART_line_settings_direct(struct bs_reply_s *reply, int index)
+static int UART_line_settings_direct(struct bs_reply_s *reply, int index)
 {
   int widths[NWIDTHS];
   char s[100];

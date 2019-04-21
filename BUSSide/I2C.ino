@@ -135,8 +135,7 @@ write_I2C_eeprom(struct bs_request_s *request)
   return reply;
 }
 
-static void
-I2C_active_scan1(struct bs_request_s *request, struct bs_reply_s *reply, int sdaPin, int sclPin)
+static void I2C_active_scan1(struct bs_request_s *request, struct bs_reply_s *reply, int sdaPin, int sclPin)
 {
   uint32_t *reply_data;
   int numberOfSlaves;
